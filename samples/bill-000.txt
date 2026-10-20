@@ -1,0 +1,23 @@
+ALTA BATES SUMMIT MEDICAL CENTER ALTA BATES CAMPUS
+PATIENT FINANCIAL SERVICES  ·  CA
+
+ITEMIZED STATEMENT OF CHARGES
+
+Account No: 76411066      Date of Service: 2026-02-11
+Patient: SAMPLE PATIENT        Guarantor: SELF PAY
+
+SVC DATE   CODE     DESCRIPTION                              QTY      CHARGES
+--------------------------------------------------------------------------------
+2026-02-11  74177    HCHG CT ABD & PELVIS W/CON                10     165,740.00
+2026-02-11  93010    MISCELLANE0US  HOSPITAL SERVICE            1         365.75
+2026-02-11  J1885    KETOROLAC TROMETHAMINE 15 MG/ML IJ SOL     1          74.64
+2026-02-11  72148    HCHG MRI SPINE LUMB WO CONTR               1       5,217.00
+2026-02-11  G0379    HCHG OBS DIRECT ADMIT                     10      14,287.00
+2026-02-11  J7030    NACL 0.9% IV SOLN FOR LINE FLUSH OR PR     1          10.00
+2026-02-11  80048    HCHG CORE BASIC METBLC PNL TOTAL CA        1         383.00
+2026-02-11  96365    HCHG INFUSION INITIAL W/MED UP TO 1 HR     1       1,578.20
+2026-02-11  85027    HCHG CORE CBC AUTO                        10       2,457.00
+--------------------------------------------------------------------------------
+                                                 TOTAL CHARGES     190,112.59
+
+Questions about this statement? Call the number on your insurance card.

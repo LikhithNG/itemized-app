@@ -1,0 +1,19 @@
+DOYLESTOWN HOSPITAL
+PATIENT FINANCIAL SERVICES  ·  PA
+
+ITEMIZED STATEMENT OF CHARGES
+
+Account No: 22046977      Date of Service: 2026-09-17
+Patient: SAMPLE PATIENT        Guarantor: SELF PAY
+
+SVC DATE   CODE     DESCRIPTION                              QTY      CHARGES
+--------------------------------------------------------------------------------
+2026-09-17  99282    E/R  VISIT LEVEL II                       10      16,050.00
+2026-09-17  83036    LAB CHEM GLYCOHEMOGLOBIN                   1         206.70
+2026-09-17  J7030    NSS1000 - 0.9% SODCHLOR 1000ML            10         381.10
+2026-09-17  99284    E/R VISIT LEVEL IV                         1       1,605.00
+2026-09-17  80048    LAB BASIC METABOLIC PANEL                  1         482.00
+--------------------------------------------------------------------------------
+                                                 TOTAL CHARGES      18,724.80
+
+Questions about this statement? Call the number on your insurance card.
