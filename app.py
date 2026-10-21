@@ -48,6 +48,12 @@ def _load_credentials():
                 os.environ.setdefault(k.strip(), v.strip().strip("\"'"))
 
     os.environ.setdefault("LLM_PROVIDER", "groq")
+    # groq.py falls back to llama-3.3-70b-versatile, which this project's key cannot reach —
+    # it returns 404 model_not_found. Default to models the key actually serves, so the app
+    # needs only GROQ_API_KEY to run and cannot be broken by a missing optional secret.
+    os.environ.setdefault("GROQ_MODEL", "openai/gpt-oss-120b")
+    os.environ.setdefault("GROQ_POOL",
+                          "openai/gpt-oss-120b,openai/gpt-oss-20b,qwen/qwen3.8-27b")
 
 
 _load_credentials()
