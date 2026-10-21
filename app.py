@@ -52,6 +52,18 @@ def _load_credentials():
 
 _load_credentials()
 
+
+def credential_problem():
+    """Tell a missing key apart from a failing service, so the error can say which."""
+    key = os.environ.get("GROQ_API_KEY", "")
+    if not key:
+        return "no key is configured"
+    if "…" in key or key.strip() in {"gsk_…", "gsk_...", "your-key"}:
+        return "the key is still the placeholder text"
+    if not key.startswith("gsk_") or len(key) < 40:
+        return "the key does not look like a Groq key"
+    return None
+
 # Verdicts are written for the pipeline. A patient needs a sentence, not a constant.
 VERDICTS = {
     "VERIFIED": ("Matches the posted price", "ok",
@@ -237,9 +249,20 @@ if run:
         items, meta = [], {"ok": False, "error": "unreachable"}
 
     if not meta.get("ok"):
-        st.error("**We could not read this bill just now**\n\nThe reading service did not "
-                 "respond. This is on us, not your bill — wait about a minute and press "
-                 "Check this bill again. Nothing you entered was lost.")
+        setup = credential_problem()
+        if setup:
+            # A configuration fault, not a transient one — saying "try again" would be wrong.
+            st.error(f"**This tool is not finished being set up**\n\nIt cannot reach the "
+                     f"reading service because {setup}. Nothing is wrong with your bill. "
+                     f"If you are testing this for me, tell me you saw this message.")
+            st.caption(f"For the maintainer: provider={os.environ.get('LLM_PROVIDER')} · "
+                       f"model={os.environ.get('GROQ_MODEL', 'default')} · "
+                       f"error={str(meta.get('error'))[:160]}")
+        else:
+            st.error("**We could not read this bill just now**\n\nThe reading service did "
+                     "not respond. This is on us, not your bill — wait about a minute and "
+                     "press Check this bill again. Nothing you entered was lost.")
+            st.caption(f"For the maintainer: {str(meta.get('error'))[:200]}")
         st.stop()
 
     if not items:
