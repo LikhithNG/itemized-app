@@ -93,6 +93,16 @@ def _line_block(rv):
             bits.append(f"difference ${l['amount_over']:,.2f}")
         if l['medicare_payment'] is not None:
             bits.append(f"medicare pays ${l['medicare_payment']:,.2f}")
+        if (l['verdict'] == 'QUANTITY_SUSPECT' and l.get('posted_price')
+                and l.get('units', 0) > 1):
+            # Without these the letter quotes the rate difference as if it were the whole
+            # exposure on a line whose quantity is also disputed.
+            per_unit = round(l['charged'] / l['units'], 2)
+            beyond = round(l['charged'] - l['posted_price'] - (l.get('amount_over') or 0), 2)
+            bits.append(f"actually billed per unit ${per_unit:,.2f}")
+            bits.append(f"further at stake if the quantity is wrong ${beyond:,.2f} "
+                        f"({l['units'] - 1} more at the posted rate), separate from any "
+                        f"rate difference already counted")
         if l.get('reason'):
             label = 'note' if l['verdict'] == 'VERIFIED' else 'why flagged'
             bits.append(f"{label}: {l['reason']}")

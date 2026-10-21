@@ -195,15 +195,28 @@ def verdict_card(line):
                   + "</div>") if posted else ""
     qty_bit = ""
     if line["verdict"] == "QUANTITY_SUSPECT" and posted and line["units"] > 1:
-        # Two testers read the flag and the posted figure as contradicting each other: the
-        # tool called the quantity wrong, then showed a comparison built on that quantity.
-        # The per-unit consequence was never stated anywhere, so the amount actually at
-        # stake on these lines - by far the largest on both bills - went unmentioned.
-        at_one = round(line["charged"] - posted, 2)
-        qty_bit = (f"<div class='why'>Billed once, this line would be {money(posted)}. "
-                   f"If the quantity is wrong, {money(at_one)} of this charge is in "
-                   f"question. That is not part of the unexplained difference above, "
-                   f"because the rate charged for each one is correct.</div>")
+        # A quantity flag and a rate overcharge can occur on the same line. An earlier
+        # version of this card asserted that the per-unit rate was correct and that none of
+        # the line reached the headline - true on a bill where the rate matches, false on
+        # one where it does not, and it was shown on both. On Alta Bates 74177 each unit was
+        # billed at twice the posted rate and $82,870.00 of it was already in the headline
+        # while this card denied both. The two cases are now told apart.
+        units = line["units"]
+        over = line.get("amount_over") or 0
+        at_one = round(line["charged"] - posted, 2)   # owed back if a single unit was right
+        per_unit = round(line["charged"] / units, 2)
+        beyond_rate = round(at_one - over, 2)         # the part the headline does not hold
+        if over > 0:
+            qty_bit = (f"<div class='why'>Each one was billed at {money(per_unit)} against a "
+                       f"posted {money(posted)}, and {money(over)} of that is already counted "
+                       f"in the unexplained difference above. If the quantity is also wrong, "
+                       f"a further {money(beyond_rate)} — {units - 1} more at the posted rate "
+                       f"— is in question on top of it.</div>")
+        else:
+            qty_bit = (f"<div class='why'>Billed once, this line would be {money(posted)}. "
+                       f"Each one was charged at the posted rate, so none of this line is "
+                       f"counted in the unexplained difference above — but if the quantity "
+                       f"is wrong, {money(at_one)} of this charge is in question.</div>")
     src = line.get("source_url") or ""
     src_bit = f"<div class='src'>Source: {src}</div>" if src else ""
     # Emitted as one line: a blank line inside raw HTML ends the block for Streamlit's
