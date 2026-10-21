@@ -82,8 +82,12 @@ VERDICTS = {
     "NOT_POSTED": ("No published price to compare", "info",
                    "This hospital does not publish a price for this code, so it cannot "
                    "be checked. Worth asking about."),
-    "DUPLICATE": ("Billed more than once", "bad",
-                  "The same code appears earlier on this bill."),
+    # A tester noted that two bags of saline on one visit is ordinary, so presenting a repeat
+    # as an established error overstates what this check can know. Amber, not red.
+    "DUPLICATE": ("Billed more than once", "warn",
+                  "The same code appears earlier on this bill. That can be legitimate — two "
+                  "bags of saline, two X-rays — so it is worth asking whether both were "
+                  "actually given rather than assuming an error."),
     "UNREADABLE": ("Could not read this line", "info",
                    "This line was missing a code, a quantity or an amount."),
 }

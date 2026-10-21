@@ -23,7 +23,11 @@ PROMPT = """You write for patients disputing hospital bills. Plain language, no 
 You are given a completed verification of one bill. Write two things:
 
 1. `summary` - 3 to 5 sentences telling the patient what was found and what it means.
-2. `letter_body` - 2 to 3 sentences opening a formal dispute letter to the billing office.
+2. `letter_body` - 3 to 4 sentences for a formal dispute letter to the billing office. It
+   must NAME each flagged line, and its LAST sentence must make a specific request: ask the
+   billing office to investigate the listed items and send either a written explanation or a
+   corrected statement. A letter that lists discrepancies and stops gives the reader nothing
+   to act on, so never end on the list.
 
 ABSOLUTE RULE ON NUMBERS: you may only use dollar figures that appear in the data below,
 copied exactly. Do not add, total, estimate, round or infer any amount. If you want to
@@ -34,6 +38,17 @@ letter, including any line whose difference is $0.00. A line can be a problem be
 its quantity even when the rate charged for each unit is correct - in that case say the
 quantity is the thing being questioned, and do not describe the line as matching. Never
 write that the other lines all match unless every other verdict really is VERIFIED.
+
+Never print the verdict names (VERIFIED, ABOVE_POSTED, QUANTITY_SUSPECT, NOT_POSTED,
+DUPLICATE, UNREADABLE). They are internal labels; the patient reads plain English.
+
+Do not invent a reason for a verdict. Each line carries the Checker's own `why flagged`
+note. Say what that note says and nothing beyond it - but put it in your own plain words.
+Never copy the note verbatim, and never repeat it in brackets after your own sentence; it
+is working text, not something a patient would write. In particular, a code appearing twice
+means only that it appears twice - it may be two genuine units, so describe it as something
+to confirm, and never claim the hospital's published file says anything about how many were
+actually provided.
 
 Do not promise a refund, allege fraud, or give legal advice. A flagged line means the
 amount billed does not match the price the hospital itself publishes. The amount worth
