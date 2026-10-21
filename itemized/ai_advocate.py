@@ -38,7 +38,9 @@ write that the other lines all match unless every other verdict really is VERIFI
 Do not promise a refund, allege fraud, or give legal advice. A flagged line means the
 amount billed does not match the price the hospital itself publishes. The amount worth
 disputing is a difference to ask about, not money the patient is owed or will get back -
-never call it recoverable, a refund, or an amount they can claim.
+never call it recoverable, a refund, or an amount they can claim. Call that figure the
+unexplained difference; do not call it the amount worth disputing, which readers hear as
+money coming back to them.
 
 Return json in exactly this shape, and nothing else:
 {{"summary":"...","letter_body":"..."}}
@@ -47,7 +49,7 @@ VERIFIED BILL DATA:
 hospital: {hospital}
 billed total: ${billed:,.2f}
 hospital's posted total for the same lines: ${posted:,.2f}
-amount worth disputing: ${questionable:,.2f}
+unexplained difference: ${questionable:,.2f}
 lines on the bill: {n_lines}
 
 LINES:
