@@ -29,8 +29,16 @@ ABSOLUTE RULE ON NUMBERS: you may only use dollar figures that appear in the dat
 copied exactly. Do not add, total, estimate, round or infer any amount. If you want to
 describe a quantity you do not have a figure for, use words instead of a number.
 
+EVERY line whose verdict is not VERIFIED must be mentioned in both the summary and the
+letter, including any line whose difference is $0.00. A line can be a problem because of
+its quantity even when the rate charged for each unit is correct - in that case say the
+quantity is the thing being questioned, and do not describe the line as matching. Never
+write that the other lines all match unless every other verdict really is VERIFIED.
+
 Do not promise a refund, allege fraud, or give legal advice. A flagged line means the
-amount billed does not match the price the hospital itself publishes.
+amount billed does not match the price the hospital itself publishes. The amount worth
+disputing is a difference to ask about, not money the patient is owed or will get back -
+never call it recoverable, a refund, or an amount they can claim.
 
 Return json in exactly this shape, and nothing else:
 {{"summary":"...","letter_body":"..."}}
@@ -46,15 +54,31 @@ LINES:
 {lines}"""
 
 def _line_block(rv):
+    """One line per charge, including why the Checker flagged it.
+
+    User testing found the Advocate dropping flagged lines from both the summary and the
+    letter. The cause was here: a QUANTITY_SUSPECT line whose per-unit rate is correct has
+    a difference of $0.00, so what this function emitted was numerically identical to a
+    VERIFIED line. The model was not ignoring the problem - it was never shown one. The
+    Checker's own `reason` is now passed through, so the prose can say what the verdict means.
+    """
     out = []
     for l in rv['lines']:
-        bits = [f"- {l['verdict']} | code {l['code']} | billed ${l['charged']:,.2f}"]
+        bits = [f"- {l['verdict']} | code {l['code']} | qty {l['units']} "
+                f"| billed ${l['charged']:,.2f}"]
         if l['expected_for_units'] is not None:
-            bits.append(f"hospital posts ${l['expected_for_units']:,.2f}")
+            # Named for what it is: the posted rate times the quantity billed. Calling it
+            # "hospital posts" let the quantity in dispute pass as a price the hospital set.
+            bits.append(f"posted rate x qty billed ${l['expected_for_units']:,.2f}")
+        if l.get('posted_price') is not None:
+            bits.append(f"posted rate for one ${l['posted_price']:,.2f}")
         if l['amount_over'] and l['amount_over'] > 0:
             bits.append(f"difference ${l['amount_over']:,.2f}")
         if l['medicare_payment'] is not None:
             bits.append(f"medicare pays ${l['medicare_payment']:,.2f}")
+        if l.get('reason'):
+            label = 'note' if l['verdict'] == 'VERIFIED' else 'why flagged'
+            bits.append(f"{label}: {l['reason']}")
         out.append(' | '.join(bits))
     return '\n'.join(out)
 

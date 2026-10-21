@@ -125,6 +125,18 @@ def reference_table():
     return load_reference(str(REFERENCE))
 
 
+def sample_label(path):
+    """The hospital name off the first line of a sample.
+
+    The samples deliberately use different formats, to show the reader coping with more
+    than one. One wraps its header in rules of '=', which two testers read as a rendering
+    fault in the menu rather than as part of the bill. Strip the decoration, and re-case
+    only a label that arrives shouting - titling a mixed-case name turns NC into Nc.
+    """
+    raw = path.read_text().strip().splitlines()[0].strip("=~|-").strip()
+    return raw.title() if raw.isupper() else raw
+
+
 @st.cache_data(show_spinner=False)
 def hospital_names():
     import csv
@@ -177,6 +189,17 @@ def verdict_card(line):
                   + (f" · Medicare pays {money(line['medicare_payment'])}"
                      if line.get("medicare_payment") else "")
                   + "</div>") if posted else ""
+    qty_bit = ""
+    if line["verdict"] == "QUANTITY_SUSPECT" and posted and line["units"] > 1:
+        # Two testers read the flag and the posted figure as contradicting each other: the
+        # tool called the quantity wrong, then showed a comparison built on that quantity.
+        # The per-unit consequence was never stated anywhere, so the amount actually at
+        # stake on these lines - by far the largest on both bills - went unmentioned.
+        at_one = round(line["charged"] - posted, 2)
+        qty_bit = (f"<div class='why'>Billed once, this line would be {money(posted)}. "
+                   f"If the quantity is wrong, {money(at_one)} of this charge is in "
+                   f"question. That is not part of the unexplained difference above, "
+                   f"because the rate charged for each one is correct.</div>")
     src = line.get("source_url") or ""
     src_bit = f"<div class='src'>Source: {src}</div>" if src else ""
     # Emitted as one line: a blank line inside raw HTML ends the block for Streamlit's
@@ -187,7 +210,7 @@ def verdict_card(line):
         f"<span class='amt'>{money(line['charged'])}</span></div>"
         f"<div class='desc'>{line.get('description','')}"
         f"<span class='code'> · {line['code']} · qty {line['units']}</span></div>"
-        f"<div class='why'>{why}</div>{posted_bit}{src_bit}"
+        f"<div class='why'>{why}</div>{posted_bit}{qty_bit}{src_bit}"
         f"</div>")
 
 
@@ -207,11 +230,14 @@ with tab_sample:
     choice = st.selectbox(
         "Sample statement",
         SAMPLES,
-        format_func=lambda p: p.read_text().strip().splitlines()[0].title(),
+        format_func=sample_label,
         key="sample_choice")
     sample_text = choice.read_text() if choice else ""
     with st.expander("See the statement"):
         st.code(sample_text, language=None)
+        st.caption("Shown exactly as it arrives. Hospitals issue itemized statements in "
+                   "very different formats — some print tidy columns, others export "
+                   "delimited text — and the reader is built to handle both.")
 
 with tab_paste:
     pasted = st.text_area(
@@ -241,6 +267,10 @@ st.divider()
 run = st.button("Check this bill", type="primary", use_container_width=True)
 
 if run:
+    # A new run invalidates whatever is on screen. Without this, a failed run would leave
+    # the previous bill's results sitting under the error message.
+    st.session_state.pop("result", None)
+
     problem = validate(bill_text, hospital)
     if problem:
         title, detail = problem
@@ -277,29 +307,8 @@ if run:
                  "with a code, a quantity and an amount — rather than the summary page.")
         st.stop()
 
-    if meta.get("items_dropped"):
-        st.info(f"{meta['items_dropped']} line(s) were skipped because a code, quantity or "
-                "amount could not be read. Everything below is from the lines that were "
-                "complete.")
-
     from checker import check_bill
     reviewed = check_bill({"hospital_name": hospital, "line_items": items}, reference_table())
-
-    st.subheader("What we found")
-    a, b, c = st.columns(3)
-    a.metric("You were billed", money(reviewed["billed_total"]))
-    b.metric("This hospital posts", money(reviewed["posted_total"]))
-    c.metric("Worth disputing", money(reviewed["questionable_amount"]))
-
-    flagged = [l for l in reviewed["lines"] if l["verdict"] != "VERIFIED"]
-    if flagged:
-        st.warning(f"**{len(flagged)} of {len(reviewed['lines'])} lines need attention.** "
-                   "Each one below says what it is and where the comparison price came from.")
-    else:
-        st.success("Every line matches the price this hospital publishes. Nothing to dispute.")
-
-    for line in reviewed["lines"]:
-        st.markdown(verdict_card(line), unsafe_allow_html=True)
 
     with st.spinner("Writing your summary…"):
         narrative, letter = "", ""
@@ -315,6 +324,58 @@ if run:
                 letter = letter_body
         except Exception:
             pass
+
+    # Everything the page needs is stored before any of it is drawn. A download button is a
+    # widget like any other: pressing one reruns the script, and `run` is False on that pass,
+    # so a result computed inside `if run:` and drawn there vanishes the moment the user
+    # downloads the letter. A tester hit exactly that and had to re-run the check to get the
+    # review as well. Holding the result in session state also stops the summary being
+    # rewritten by the model on every rerun, which made the wording change under the user.
+    st.session_state["result"] = {
+        "reviewed": reviewed,
+        "hospital": hospital,
+        "narrative": narrative,
+        "letter": letter,
+        "items_dropped": meta.get("items_dropped"),
+    }
+
+result = st.session_state.get("result")
+
+if result:
+    reviewed = result["reviewed"]
+    hospital = result["hospital"]
+    narrative = result["narrative"]
+    letter = result["letter"]
+
+    if result.get("items_dropped"):
+        st.info(f"{result['items_dropped']} line(s) were skipped because a code, quantity or "
+                "amount could not be read. Everything below is from the lines that were "
+                "complete.")
+
+    st.subheader("What we found")
+    a, b, c = st.columns(3)
+    a.metric("You were billed", money(reviewed["billed_total"]))
+    b.metric("This hospital posts", money(reviewed["posted_total"]),
+             help="The hospital's published rate for each code, multiplied by the quantity "
+                  "on the bill. Where a quantity is itself in question, this figure uses "
+                  "the quantity as billed.")
+    c.metric("Unexplained difference", money(reviewed["questionable_amount"]),
+             help="The gap between what you were billed and what this hospital publishes, "
+                  "on the lines flagged below. It is a figure to ask about — not an amount "
+                  "you are owed, and not a refund estimate.")
+    st.caption("**Unexplained difference** is the gap worth raising with the billing office. "
+               "It is not money you are owed and not a refund estimate — what you actually "
+               "pay depends on your insurance and on the rate that applies to you.")
+
+    flagged = [l for l in reviewed["lines"] if l["verdict"] != "VERIFIED"]
+    if flagged:
+        st.warning(f"**{len(flagged)} of {len(reviewed['lines'])} lines need attention.** "
+                   "Each one below says what it is and where the comparison price came from.")
+    else:
+        st.success("Every line matches the price this hospital publishes. Nothing to dispute.")
+
+    for line in reviewed["lines"]:
+        st.markdown(verdict_card(line), unsafe_allow_html=True)
 
     st.subheader("In plain language")
     if narrative:
@@ -345,12 +406,17 @@ if run:
         "Download this review",
         data="\n".join(
             [f"ITEMIZED — bill review", f"Hospital: {hospital}", "",
-             f"Billed:          {money(reviewed['billed_total'])}",
-             f"Hospital posts:  {money(reviewed['posted_total'])}",
-             f"Worth disputing: {money(reviewed['questionable_amount'])}", ""] +
+             f"Billed:                 {money(reviewed['billed_total'])}",
+             f"Hospital posts:         {money(reviewed['posted_total'])}",
+             f"Unexplained difference: {money(reviewed['questionable_amount'])}",
+             "",
+             "The unexplained difference is a gap to ask the billing office about. It is",
+             "not an amount you are owed and not a refund estimate. Where a quantity is in",
+             "question, the posted figure above uses the quantity as billed.", ""] +
             [f"{l['code']:>8}  qty {l['units']:>3}  {money(l['charged']):>12}  "
              f"{VERDICTS.get(l['verdict'], ('',))[0]}" for l in reviewed["lines"]]),
         file_name="itemized-review.txt", use_container_width=True)
+
 
 st.divider()
 st.caption(
