@@ -3,9 +3,23 @@
 Check every line of a hospital bill against the prices that hospital is legally required to
 publish, so you can dispute the difference before paying.
 
-Streamlit front end over the Assignment 4 pipeline. The modules in `itemized/` are copied
-unchanged from `Assignment4_Itemized/evidence/`, so the interface shows exactly what the
-pipeline produces — there is no second implementation that can drift from it.
+Streamlit front end over the Assignment 4 pipeline. `checker.py` and `llm.py` are copied byte
+for byte from `Assignment4_Itemized/evidence/`, so every figure this interface shows is
+produced by the Checker that was already graded — there is no second implementation that can
+drift from it.
+
+The modules around it have changed since Assignment 4, and none of them computes a figure:
+
+| Module | Why it differs from A4 |
+|---|---|
+| `ai_reader.py` | reads a photograph as well as text; uses `codes.py` for what counts as a code |
+| `gemini.py` | image input channel; falls through an overloaded model; bounded wait; timed quota retirement |
+| `groq.py` | timed quota retirement |
+| `ai_advocate.py` | prompt forbids misdescribing the Medicare benchmark |
+| `provenance.py` | guard allows figures the Checker derived, still rejects invented ones |
+| `codes.py` | new — one definition of a billing code, replacing four that disagreed |
+| `pool_state.py` | new — model quota retirement expires instead of lasting the process's life |
+
 
 ## Deploying to Streamlit Community Cloud
 
