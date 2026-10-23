@@ -52,8 +52,9 @@ BILL TEXT:
 {bill}
 ---"""
 
-# a bare minimum sanity filter; the Checker does the real verification
-CODE_OK = re.compile(r'^[A-Z]?\d{3,5}[A-Z]?$')
+# A bare-minimum sanity filter; the Checker does the real verification. The shape of a
+# billing code lives in one place - see codes.py for why it is not written inline here.
+from codes import is_code
 
 def read_bill(bill_text):
     """Returns (line_items, meta). meta records what happened, for the error-handling log."""
@@ -73,7 +74,7 @@ def read_bill(bill_text):
             charged = float(it.get('charged'))
         except (TypeError, ValueError):
             dropped += 1; continue
-        if not CODE_OK.match(code) or charged <= 0 or units <= 0:
+        if not is_code(code) or charged <= 0 or units <= 0:
             dropped += 1; continue
         items.append({'code': code, 'description': str(it.get('description', '')).strip(),
                       'units': units, 'charged': round(charged, 2)})
