@@ -94,21 +94,77 @@ VERDICTS = {
 
 CSS = """
 <style>
-.block-container{max-width:860px}
-.verdict{border:1px solid #E4E7ED;border-left-width:5px;border-radius:10px;
-  padding:13px 16px;margin-bottom:10px;background:#fff}
-.verdict.ok{border-left-color:#15804F}
-.verdict.bad{border-left-color:#B23A33}
-.verdict.warn{border-left-color:#9A6B0E}
-.verdict.info{border-left-color:#5D6575}
+:root{
+  --ink:#121620; --muted:#5A6373; --faint:#8A93A3; --line:#E3E8F0;
+  --bad:#B4322B; --warn:#9A6B0E; --ok:#15804F; --info:#4A5568; --accent:#1E4FA3;
+  --bad-bg:#FDF3F2; --warn-bg:#FDF8EC; --ok-bg:#F1F8F4; --info-bg:#F5F7FA;
+}
+.block-container{max-width:880px;padding-top:2.2rem}
+
+/* ---- masthead ---------------------------------------------------------- */
+.mast{border-bottom:3px solid var(--ink);padding-bottom:16px;margin-bottom:6px}
+.mast h1{font-size:40px;letter-spacing:-1.1px;line-height:1;margin:0 0 9px;
+  font-weight:700;color:var(--ink)}
+.mast .sub{font-size:16.5px;color:var(--muted);line-height:1.5;max-width:62ch;margin:0}
+.badge{display:inline-block;font-size:11px;letter-spacing:.9px;text-transform:uppercase;
+  font-weight:700;color:var(--accent);background:#EAF0FB;border-radius:999px;
+  padding:4px 11px;margin-bottom:11px}
+
+/* ---- step headers ------------------------------------------------------ */
+.step{display:flex;align-items:center;gap:10px;margin:26px 0 10px}
+.step .n{width:23px;height:23px;border-radius:50%;background:var(--ink);color:#fff;
+  font-size:12.5px;font-weight:700;display:flex;align-items:center;justify-content:center;
+  flex:0 0 23px}
+.step .t{font-size:18px;font-weight:700;color:var(--ink)}
+
+/* ---- the headline figures --------------------------------------------- */
+.totals{display:flex;gap:0;border:1px solid var(--line);border-radius:12px;
+  overflow:hidden;margin:4px 0 10px;background:#fff}
+.totals .cell{flex:1;padding:15px 17px;border-right:1px solid var(--line)}
+.totals .cell:last-child{border-right:none;background:#FBF8F2}
+.totals .k{font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;
+  color:var(--faint);font-weight:700;margin-bottom:5px}
+.totals .v{font-size:25px;font-weight:700;color:var(--ink);letter-spacing:-.6px;
+  line-height:1.1}
+.totals .cell.hero .v{color:#8A5A00;font-size:29px}
+.totals .n{font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.4}
+
+/* ---- what to do next --------------------------------------------------- */
+.todo{border:1px solid #D6E0F2;background:#F7FAFF;border-radius:12px;
+  padding:16px 18px;margin:14px 0 6px}
+.todo .h{font-size:13px;letter-spacing:.6px;text-transform:uppercase;font-weight:700;
+  color:var(--accent);margin-bottom:9px}
+.todo ol{margin:0;padding-left:19px}
+.todo li{font-size:14.5px;color:var(--ink);line-height:1.55;margin-bottom:7px}
+.todo li:last-child{margin-bottom:0}
+.todo .tail{font-size:12.5px;color:var(--muted);margin:10px 0 0;line-height:1.5}
+
+/* ---- line cards -------------------------------------------------------- */
+.verdict{border:1px solid var(--line);border-left-width:4px;border-radius:10px;
+  padding:13px 16px;margin-bottom:9px;background:#fff}
+.verdict.ok{border-left-color:var(--ok);background:var(--ok-bg)}
+.verdict.bad{border-left-color:var(--bad);background:var(--bad-bg)}
+.verdict.warn{border-left-color:var(--warn);background:var(--warn-bg)}
+.verdict.info{border-left-color:var(--info);background:var(--info-bg)}
 .verdict .top{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
-.verdict .code{font-family:'SF Mono',Menlo,monospace;font-size:13px;color:#5D6575}
-.verdict .label{font-weight:700;font-size:15px}
-.verdict .amt{font-weight:700;font-size:15px;white-space:nowrap}
-.verdict .desc{font-size:13.5px;color:#161A22;margin-top:4px}
-.verdict .why{font-size:13px;color:#5D6575;margin-top:5px;line-height:1.5}
-.verdict .src{font-size:11.5px;color:#98A0AE;margin-top:7px;word-break:break-all}
-.lede{font-size:17px;color:#5D6575;line-height:1.55}
+.verdict .label{font-weight:700;font-size:14.5px;color:var(--ink)}
+.verdict.ok .label{color:var(--ok)}
+.verdict.bad .label{color:var(--bad)}
+.verdict.warn .label{color:var(--warn)}
+.verdict .amt{font-weight:700;font-size:15.5px;white-space:nowrap;color:var(--ink)}
+.verdict .desc{font-size:13.5px;color:var(--ink);margin-top:4px}
+.verdict .code{font-family:'SF Mono',Menlo,monospace;font-size:12.5px;color:var(--muted)}
+.verdict .why{font-size:13px;color:var(--muted);margin-top:5px;line-height:1.5}
+.verdict .figs{font-size:12.5px;color:var(--muted);margin-top:7px;
+  padding-top:7px;border-top:1px dashed var(--line)}
+.verdict .figs b{color:var(--ink);font-weight:700}
+.verdict .src{font-size:12px;margin-top:6px}
+.verdict .src a{color:var(--accent);text-decoration:none;border-bottom:1px solid #C3D4EE}
+.verdict .src .meta{color:var(--faint)}
+
+.sectlabel{font-size:12px;letter-spacing:.8px;text-transform:uppercase;font-weight:700;
+  color:var(--faint);margin:20px 0 8px}
+.lede{font-size:17px;color:var(--muted);line-height:1.55}
 </style>
 """
 
@@ -185,11 +241,95 @@ def validate(text, hospital):
     return None
 
 
+@st.cache_data(show_spinner=False)
+def source_meta():
+    """Readable provenance for each hospital's price file.
+
+    Every user-test session noticed the source link and none could evaluate it - a 200-
+    character CDN URL tells a patient nothing about what they are looking at. The reference
+    table already carries the file's size and the date it was retrieved, so the link can
+    carry a name, a date and a format instead of being its own raw address.
+    """
+    import csv
+    out = {}
+    with REFERENCE.open(encoding="utf-8-sig") as fh:
+        for r in csv.DictReader(fh):
+            url = (r.get("mrf_source_url") or "").strip()
+            if not url or url in out:
+                continue
+            try:
+                mb = f"{float(r['mrf_file_mb']):,.0f} MB"
+            except (TypeError, ValueError, KeyError):
+                mb = ""
+            out[url] = {
+                "hospital": r.get("hospital_name", "").strip(),
+                "retrieved": (r.get("retrieved_at") or "")[:10],
+                "size": mb,
+                "ext": url.rsplit(".", 1)[-1].upper()[:4] if "." in url[-6:] else "FILE",
+            }
+    return out
+
+
+def source_line(url):
+    """A citation a patient can read, with the raw URL kept as the link target."""
+    m = source_meta().get(url)
+    if not m:
+        return f"<div class='src'><a href='{url}'>Published price file</a></div>"
+    # The hospital is named once at the top of the page; repeating it on every line is noise.
+    # What a reader cannot get elsewhere is the format, the size and the date.
+    bits = [b for b in (m["ext"], m["size"],
+                        f"retrieved {m['retrieved']}" if m["retrieved"] else "") if b]
+    return (f"<div class='src'><a href='{url}'>Published standard-charge file</a>"
+            f"<span class='meta'> · {' · '.join(bits)}</span></div>")
+
+
+ASKS = {
+    "ABOVE_POSTED": lambda l: (
+        f"Ask why code <b>{l['code']}</b> was billed {money(l['charged'])} when this hospital "
+        f"publishes {money(l['posted_price'])} for it"
+        + (f" — a difference of {money(l['amount_over'])}." if l.get("amount_over") else ".")),
+    "QUANTITY_SUSPECT": lambda l: (
+        f"Ask whether all <b>{l['units']}</b> of code <b>{l['code']}</b> were actually "
+        f"provided — this is normally billed once per visit."),
+    "NOT_POSTED": lambda l: (
+        f"Ask what this hospital publishes for code <b>{l['code']}</b>. It is not in their "
+        f"published file, so this {money(l['charged'])} charge could not be checked."),
+    "DUPLICATE": lambda l: (
+        f"Ask whether both entries of code <b>{l['code']}</b> were provided. Two of the same "
+        f"service on one visit can be legitimate — worth confirming rather than assuming."),
+    "UNREADABLE": lambda l: (
+        f"Ask for a clearer copy of the line showing code <b>{l['code']}</b> — it was missing "
+        f"a code, quantity or amount."),
+}
+
+ORDER = {"ABOVE_POSTED": 0, "QUANTITY_SUSPECT": 1, "DUPLICATE": 2,
+         "NOT_POSTED": 3, "UNREADABLE": 4, "VERIFIED": 5}
+
+
+def action_list(reviewed):
+    """The questions to put to the billing office, which is what this tool claims to produce.
+
+    The positioning settled on after user testing is that Itemized turns a bill into specific
+    sourced questions. Both testers independently wrote their own version of this list at the
+    end of their session; the interface was making them do that work by hand.
+    """
+    flagged = sorted((l for l in reviewed["lines"] if l["verdict"] != "VERIFIED"),
+                     key=lambda l: (ORDER.get(l["verdict"], 9), -(l.get("charged") or 0)))
+    if not flagged:
+        return ""
+    items = "".join(f"<li>{ASKS[l['verdict']](l)}</li>" for l in flagged if l["verdict"] in ASKS)
+    return ("<div class='todo'><div class='h'>What to ask the billing office</div>"
+            f"<ol>{items}</ol>"
+            "<p class='tail'>Take the figures with you. Every one above comes from the price "
+            "file this hospital publishes itself, linked under each line below.</p></div>")
+
+
 def verdict_card(line):
     label, tone, why = VERDICTS.get(
         line["verdict"], ("Checked", "info", ""))
     posted = line.get("posted_price")
-    posted_bit = (f"<div class='why'>Hospital publishes {money(posted)} for this code"
+    posted_bit = (f"<div class='figs'>This hospital publishes <b>{money(posted)}</b> "
+                  f"for this code"
                   + (f" · Medicare pays {money(line['medicare_payment'])}"
                      if line.get("medicare_payment") else "")
                   + "</div>") if posted else ""
@@ -218,7 +358,7 @@ def verdict_card(line):
                        f"counted in the unexplained difference above — but if the quantity "
                        f"is wrong, {money(at_one)} of this charge is in question.</div>")
     src = line.get("source_url") or ""
-    src_bit = f"<div class='src'>Source: {src}</div>" if src else ""
+    src_bit = source_line(src) if src else ""
     # Emitted as one line: a blank line inside raw HTML ends the block for Streamlit's
     # markdown parser, which then prints the trailing tags as text.
     return (
@@ -232,14 +372,16 @@ def verdict_card(line):
 
 
 st.markdown(CSS, unsafe_allow_html=True)
-st.title("Itemized")
 st.markdown(
-    "<p class='lede'>Check every line of a hospital bill against the prices that hospital "
-    "is legally required to publish — so you can dispute the difference before paying.</p>",
-    unsafe_allow_html=True)
-st.divider()
+    "<div class='mast'>"
+    "<span class='badge'>45 CFR 180 · published prices</span>"
+    "<h1>Itemized</h1>"
+    "<p class='sub'>Check every line of a hospital bill against the prices that hospital is "
+    "legally required to publish — so you know what to ask before you pay.</p>"
+    "</div>", unsafe_allow_html=True)
 
-st.subheader("1 · Your bill")
+st.markdown("<div class='step'><div class='n'>1</div><div class='t'>Your bill</div></div>",
+            unsafe_allow_html=True)
 tab_sample, tab_paste = st.tabs(["Use a sample bill", "Paste my own bill"])
 
 with tab_sample:
@@ -268,7 +410,8 @@ bill_text = (st.session_state.get("pasted_text") or "").strip() or sample_text
 known = hospital_names()
 detected = detect_hospital(bill_text, known) if bill_text else None
 
-st.subheader("2 · The hospital")
+st.markdown("<div class='step'><div class='n'>2</div><div class='t'>The hospital</div></div>",
+            unsafe_allow_html=True)
 if detected:
     st.success(f"Read from the top of the bill: **{detected}**")
     hospital = detected
@@ -369,32 +512,43 @@ if result:
                 "amount could not be read. Everything below is from the lines that were "
                 "complete.")
 
-    st.subheader("What we found")
-    a, b, c = st.columns(3)
-    a.metric("You were billed", money(reviewed["billed_total"]))
-    b.metric("This hospital posts", money(reviewed["posted_total"]),
-             help="The hospital's published rate for each code, multiplied by the quantity "
-                  "on the bill. Where a quantity is itself in question, this figure uses "
-                  "the quantity as billed.")
-    c.metric("Unexplained difference", money(reviewed["questionable_amount"]),
-             help="The gap between what you were billed and what this hospital publishes, "
-                  "on the lines flagged below. It is a figure to ask about — not an amount "
-                  "you are owed, and not a refund estimate.")
-    st.caption("**Unexplained difference** is the gap worth raising with the billing office. "
-               "It is not money you are owed and not a refund estimate — what you actually "
-               "pay depends on your insurance and on the rate that applies to you.")
+    st.markdown("<div class='step'><div class='n'>3</div><div class='t'>What we found"
+                "</div></div>", unsafe_allow_html=True)
+
+    st.markdown(
+        "<div class='totals'>"
+        f"<div class='cell'><div class='k'>You were billed</div>"
+        f"<div class='v'>{money(reviewed['billed_total'])}</div></div>"
+        f"<div class='cell'><div class='k'>This hospital publishes</div>"
+        f"<div class='v'>{money(reviewed['posted_total'])}</div>"
+        f"<div class='n'>For the same lines, at the quantities billed.</div></div>"
+        f"<div class='cell hero'><div class='k'>Unexplained difference</div>"
+        f"<div class='v'>{money(reviewed['questionable_amount'])}</div>"
+        f"<div class='n'>A gap to ask about — not money you are owed, "
+        f"and not a refund estimate.</div></div>"
+        "</div>", unsafe_allow_html=True)
 
     flagged = [l for l in reviewed["lines"] if l["verdict"] != "VERIFIED"]
+    verified = [l for l in reviewed["lines"] if l["verdict"] == "VERIFIED"]
+
     if flagged:
-        st.warning(f"**{len(flagged)} of {len(reviewed['lines'])} lines need attention.** "
-                   "Each one below says what it is and where the comparison price came from.")
+        st.markdown(action_list(reviewed), unsafe_allow_html=True)
+        st.markdown(f"<div class='sectlabel'>{len(flagged)} of {len(reviewed['lines'])} lines "
+                    f"need attention</div>", unsafe_allow_html=True)
+        # Worst first. Nine cards in bill order buries the ones worth reading.
+        for line in sorted(flagged, key=lambda l: (ORDER.get(l["verdict"], 9),
+                                                   -(l.get("charged") or 0))):
+            st.markdown(verdict_card(line), unsafe_allow_html=True)
     else:
         st.success("Every line matches the price this hospital publishes. Nothing to dispute.")
 
-    for line in reviewed["lines"]:
-        st.markdown(verdict_card(line), unsafe_allow_html=True)
+    if verified:
+        with st.expander(f"{len(verified)} line(s) matched the published price"):
+            for line in verified:
+                st.markdown(verdict_card(line), unsafe_allow_html=True)
 
-    st.subheader("In plain language")
+    st.markdown("<div class='step'><div class='n'>4</div><div class='t'>In plain language"
+                "</div></div>", unsafe_allow_html=True)
     if narrative:
         st.write(plain(narrative))
         st.caption("Written automatically, then checked line by line against the figures "
