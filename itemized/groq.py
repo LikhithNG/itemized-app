@@ -7,6 +7,7 @@ in the thousands rather than Gemini free tier's 20 per model, which is the entir
 for this module's existence.
 """
 import json, os, time, urllib.request, urllib.error
+import pool_state
 
 BASE = "https://api.groq.com/openai/v1/chat/completions"
 # Groq sits behind Cloudflare, which rejects urllib's default agent with error 1010.
@@ -34,14 +35,15 @@ RETRY_ON = {429, 500, 502, 503, 504}
 POOL = [m.strip() for m in os.environ.get(
     'GROQ_POOL', 'llama-3.3-70b-versatile,llama-3.1-8b-instant,'
                  'meta-llama/llama-4-scout-17b-16e-instruct').split(',') if m.strip()]
-_exhausted = set()
+# Retirement is timed, not permanent - see pool_state.
+_exhausted = pool_state.new_state()
 
 class GroqError(RuntimeError):
     pass
 
 def pool_status():
-    return {'pool': POOL, 'exhausted': sorted(_exhausted),
-            'available': [m for m in POOL if m not in _exhausted]}
+    return {'pool': POOL, 'exhausted': pool_state.retired(_exhausted, POOL),
+            'available': pool_state.available(_exhausted, POOL)}
 
 def _key():
     k = os.environ.get('GROQ_API_KEY', '').strip()
@@ -100,11 +102,12 @@ def _one(prompt, schema, temperature, model):
 
 def generate(prompt, schema=None, temperature=0.0, model=None):
     """Calls the pool in order, retiring any model that reports a daily quota failure."""
+    global _exhausted
     if model:
         return _one(prompt, schema, temperature, model)
     last = {'ok': False, 'error': 'no models available', 'attempts': 0}
     for m in POOL:
-        if m in _exhausted:
+        if pool_state.is_retired(_exhausted, m):
             continue
         r = _one(prompt, schema, temperature, m)
         if r['ok']:
@@ -112,7 +115,7 @@ def generate(prompt, schema=None, temperature=0.0, model=None):
             return r
         last = r
         if r.get('quota') == 'daily':
-            _exhausted.add(m)
+            _exhausted = pool_state.retire(_exhausted, m)
             continue
         return r
     last['model'] = None

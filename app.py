@@ -22,35 +22,51 @@ REFERENCE = HERE / "data" / "a3_reference_table.csv"
 SAMPLES = sorted((HERE / "samples").glob("*.txt"))
 
 
+SECRET_KEYS = ("GROQ_API_KEY", "GROQ_MODEL", "GROQ_POOL", "LLM_PROVIDER",
+               "GEMINI_API_KEY", "GEMINI_MODEL", "GEMINI_POOL")
+CRED_TRACE = []
+
+
 def _load_credentials():
     """Promote credentials into the environment, where the pipeline modules read them.
 
-    On Streamlit Cloud they arrive as secrets; locally they come from .env. st.secrets is
-    only touched when a secrets file exists, because reading it without one renders a
-    warning onto the page itself.
+    On Streamlit Cloud they arrive as secrets; locally they come from .env.
+
+    This used to read st.secrets only when a secrets.toml existed at one of two guessed
+    paths, to avoid the warning Streamlit renders when you touch st.secrets with none set.
+    That is the wrong shape of check: where the platform keeps that file is its business and
+    it has moved before. The read is attempted directly now and the warning caught, so a
+    secret that exists is always found.
+
+    CRED_TRACE records what happened, never a value, so a server that behaves differently
+    from a laptop can be diagnosed from the page rather than by guessing.
     """
-    secret_files = [HERE / ".streamlit" / "secrets.toml",
-                    pathlib.Path.home() / ".streamlit" / "secrets.toml"]
-    if any(p.exists() for p in secret_files):
-        # GEMINI_* belongs here as well. Photo reading needs a vision model, Groq's pool is
-        # text only, and leaving these out meant the deployed app had no vision credential
-        # at all - every uploaded photo failed with "the reading service did not respond",
-        # which is advice to wait when the real answer was that a key was never promoted.
-        for key in ("GROQ_API_KEY", "GROQ_MODEL", "GROQ_POOL", "LLM_PROVIDER",
-                    "GEMINI_API_KEY", "GEMINI_MODEL", "GEMINI_POOL"):
-            try:
-                if key in st.secrets:
+    try:
+        # load_if_toml_exists() asks Streamlit where its own secrets live and returns
+        # quietly when there are none. Reading st.secrets directly instead prints a warning
+        # onto the page, listing absolute paths, every time the app runs on a laptop.
+        if st.secrets.load_if_toml_exists():
+            available = set(st.secrets.keys())
+            CRED_TRACE.append(f"secrets file found · {len(available)} key(s) in it")
+            for key in SECRET_KEYS:
+                if key in available:
                     os.environ.setdefault(key, str(st.secrets[key]))
-            except Exception:
-                pass
+                    CRED_TRACE.append(f"{key} · promoted from secrets")
+        else:
+            CRED_TRACE.append("no secrets file (expected on a laptop, not on a server)")
+    except Exception as e:
+        CRED_TRACE.append(f"secrets unreadable ({type(e).__name__})")
 
     env = HERE / ".env"
     if env.exists():
+        CRED_TRACE.append(".env present · loaded")
         for line in env.read_text().splitlines():
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
-                os.environ.setdefault(k.strip(), v.strip().strip("\"'"))
+                os.environ.setdefault(k.strip(), v.strip().strip("\"\'"))
+    else:
+        CRED_TRACE.append(".env absent (expected on a server)")
 
     os.environ.setdefault("LLM_PROVIDER", "groq")
     # groq.py falls back to llama-3.3-70b-versatile, which this project's key cannot reach —
@@ -64,34 +80,45 @@ def _load_credentials():
 _load_credentials()
 
 
-def vision_problem():
-    """Why a photo cannot be read, when the reason is configuration rather than weather.
+PLACEHOLDERS = {"your-key", "AIza…", "AIza...", "gsk_…", "gsk_...", "changeme", "xxx"}
 
-    Reading a photograph needs a vision-capable model. Groq's pool here is text only, so
-    this path depends on a Gemini credential, and a missing one is not something waiting a
-    minute will fix.
+
+def key_problem(name):
+    """Why a credential cannot work, when the reason is setup rather than weather.
+
+    Only two faults are worth reporting before a request is made: the key is absent, or it
+    is still the placeholder. Nothing else can be known from the string.
+
+    This used to also check the prefix and length - GROQ_API_KEY had to start with `gsk_`,
+    GEMINI_API_KEY with `AIza` and run to 30 characters. Google now issues Gemini keys
+    beginning `AQ.`, and the check turned a working key into "the vision key does not look
+    like a Google API key" and stopped the app before it ever called the API. A format
+    guess that refuses a valid credential is worse than no check at all, so the shape of
+    the key is left to the service that issued it.
     """
-    key = os.environ.get("GEMINI_API_KEY", "")
+    key = os.environ.get(name, "").strip()
     if not key:
+        return "no key is configured on this server"
+    if "…" in key or key in PLACEHOLDERS:
+        return "the key is still the placeholder text"
+    return None
+
+
+def vision_problem():
+    """Reading a photograph needs a vision model. Groq's pool here is text only, so this
+    path depends on a Gemini credential, and a missing one is not something waiting fixes.
+    """
+    fault = key_problem("GEMINI_API_KEY")
+    if fault == "no key is configured on this server":
         return ("no vision key is configured on this server, so photographs cannot be read "
                 "here yet")
-    if "…" in key or key.strip() in {"your-key", "AIza…", "AIza..."}:
-        return "the vision key is still the placeholder text"
-    if not key.startswith("AIza") or len(key) < 30:
-        return "the vision key does not look like a Google API key"
-    return None
+    return fault
 
 
 def credential_problem():
     """Tell a missing key apart from a failing service, so the error can say which."""
-    key = os.environ.get("GROQ_API_KEY", "")
-    if not key:
-        return "no key is configured"
-    if "…" in key or key.strip() in {"gsk_…", "gsk_...", "your-key"}:
-        return "the key is still the placeholder text"
-    if not key.startswith("gsk_") or len(key) < 40:
-        return "the key does not look like a Groq key"
-    return None
+    return key_problem("GROQ_API_KEY")
+
 
 # Verdicts are written for the pipeline. A patient needs a sentence, not a constant.
 VERDICTS = {
@@ -521,6 +548,40 @@ st.markdown(
     "<p class='sub'>Check every line of a hospital bill against the prices that hospital is "
     "legally required to publish — so you know what to ask before you pay.</p>"
     "</div>", unsafe_allow_html=True)
+
+def render_diagnostics():
+    """What this server can see, on request at ?diag=1.
+
+    A deployment that behaves differently from a laptop was costing a round trip through
+    the dashboard and a guess each time. The page reports on itself instead: which
+    credentials arrived and by what route, whether each is well-formed, and which models
+    the pool can still reach. No value is ever printed - only whether one is there.
+    """
+    st.markdown("#### Server diagnostics")
+    st.caption("Reached with ?diag=1. Visible to anyone with the link, so it names no "
+               "secret - only whether one arrived.")
+    for note in CRED_TRACE:
+        st.text(note)
+    for name, fault in (("GROQ_API_KEY  (text)", credential_problem()),
+                        ("GEMINI_API_KEY (photos)", vision_problem())):
+        st.text(f"{name} · {fault if fault else 'present and well-formed'}")
+    st.text(f"LLM_PROVIDER={os.environ.get('LLM_PROVIDER')} · "
+            f"GEMINI_MODEL={os.environ.get('GEMINI_MODEL', 'pool default')}")
+    try:
+        sys.path.insert(0, str(HERE / "itemized"))
+        import gemini, groq
+        for label, mod in (("gemini", gemini), ("groq", groq)):
+            st.text(f"{label} pool · {len(mod.pool_status()['available'])} of "
+                    f"{len(mod.pool_status()['pool'])} models available"
+                    + (f" · resting: {', '.join(mod.pool_status()['exhausted'])}"
+                       if mod.pool_status()['exhausted'] else ""))
+    except Exception as e:
+        st.text(f"pool status unavailable ({type(e).__name__})")
+    st.divider()
+
+
+if st.query_params.get("diag"):
+    render_diagnostics()
 
 st.markdown("<div class='step'><div class='n'>1</div><div class='t'>Your bill</div></div>",
             unsafe_allow_html=True)

@@ -6,6 +6,7 @@ exponential backoff on rate limits and transient server errors, a hard timeout, 
 structured failure return rather than an exception that kills a 120-bill run.
 """
 import json, os, time, urllib.request, urllib.error
+import pool_state
 
 BASE = "https://generativelanguage.googleapis.com/v1beta"
 
@@ -36,12 +37,23 @@ POOL = [m.strip() for m in os.environ.get(
     'GEMINI_POOL',
     'gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,'
     'gemini-flash-lite-latest,gemini-3.5-flash-lite').split(',') if m.strip()]
-_exhausted = set()
+# Retirement is timed, not permanent - see pool_state. This server outlives the daily
+# cap it was retiring models against.
+_exhausted = pool_state.new_state()
 
 def pool_status():
-    return {'pool': POOL, 'exhausted': sorted(_exhausted),
-            'available': [m for m in POOL if m not in _exhausted]}
+    return {'pool': POOL, 'exhausted': pool_state.retired(_exhausted, POOL),
+            'available': pool_state.available(_exhausted, POOL)}
 ATTEMPTS = 4
+# When a pool is in play, re-asking one overloaded model is the wrong way to spend
+# the wait. Four attempts at 2s doubling is 14s of sleep per model, and with six
+# models an interactive request sat for over two minutes before answering. Trying a
+# DIFFERENT model is both faster and likelier to work, so a pooled call gives each
+# model two attempts and moves on.
+POOL_ATTEMPTS = 2
+# And the whole pooled call is bounded, because a person is waiting on it. Past this
+# it returns an honest failure rather than holding a spinner.
+DEADLINE = int(os.environ.get('GEMINI_DEADLINE', '75'))
 BACKOFF  = 2.0          # seconds, doubled each retry
 RETRY_ON = {429, 500, 502, 503, 504}
 
@@ -61,23 +73,31 @@ def _post(url, payload):
     with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
         return json.loads(r.read())
 
-def generate(prompt, schema=None, temperature=0.0, model=None, image=None):
+def generate(prompt, schema=None, temperature=0.0, model=None, image=None,
+             deadline=None):
+    global _exhausted
     """Calls the pool in order, skipping models already known to be out of daily quota.
     Returns the first success, or the last failure if every model is exhausted."""
     if model:
         return _generate_one(prompt, schema, temperature, model, image)
+    stop_at = time.time() + (DEADLINE if deadline is None else deadline)
     last = {'ok': False, 'error': 'no models available', 'attempts': 0}
     for m in POOL:
-        if m in _exhausted:
+        if pool_state.is_retired(_exhausted, m):
             continue
-        r = _generate_one(prompt, schema, temperature, m, image)
+        if time.time() >= stop_at:
+            last = {**last, 'timed_out': True,
+                    'error': f"gave up after {DEADLINE}s · last: {last.get('error')}"}
+            break
+        r = _generate_one(prompt, schema, temperature, m, image,
+                          attempts=POOL_ATTEMPTS)
         if r['ok']:
             r['model'] = m
             return r
         last = r
         err = str(r.get('error', ''))
         if 'RESOURCE_EXHAUSTED' in err or '429' in err:
-            _exhausted.add(m)          # out of daily quota - retire it and move on
+            _exhausted = pool_state.retire(_exhausted, m)   # out of daily quota for now
             continue
         # A 503 means this model is overloaded right now, which is the other thing a pool
         # is for. The comment below used to say a non-quota failure is not fixed by another
@@ -91,7 +111,7 @@ def generate(prompt, schema=None, temperature=0.0, model=None, image=None):
     last['pool_exhausted'] = True
     return last
 
-def _generate_one(prompt, schema, temperature, model, image=None):
+def _generate_one(prompt, schema, temperature, model, image=None, attempts=None):
     """One model, with bounded retries and exponential backoff.
 
     `image` is an optional (mime_type, base64_data) pair. A photograph of a bill has no
@@ -110,8 +130,9 @@ def _generate_one(prompt, schema, temperature, model, image=None):
         parts.append({'inline_data': {'mime_type': mime, 'data': b64}})
     payload = {'contents': [{'parts': parts}], 'generationConfig': cfg}
 
+    attempts = attempts or ATTEMPTS
     last = None
-    for attempt in range(1, ATTEMPTS + 1):
+    for attempt in range(1, attempts + 1):
         try:
             raw = _post(url, payload)
             cand = (raw.get('candidates') or [{}])[0]
@@ -137,14 +158,14 @@ def _generate_one(prompt, schema, temperature, model, image=None):
             # a per-day quota failure will not clear in 15 seconds; do not burn retries on it
             if ex.code == 429 and 'PerDay' in body:
                 return {'ok': False, 'error': last, 'attempts': attempt, 'quota': 'daily'}
-            if ex.code not in RETRY_ON or attempt == ATTEMPTS:
+            if ex.code not in RETRY_ON or attempt == attempts:
                 return {'ok': False, 'error': last, 'attempts': attempt}
         except (urllib.error.URLError, TimeoutError, OSError) as ex:
             last = f'{type(ex).__name__}: {ex}'
-            if attempt == ATTEMPTS:
+            if attempt == attempts:
                 return {'ok': False, 'error': last, 'attempts': attempt}
         time.sleep(BACKOFF * (2 ** (attempt - 1)))
-    return {'ok': False, 'error': last or 'exhausted retries', 'attempts': ATTEMPTS}
+    return {'ok': False, 'error': last or 'exhausted retries', 'attempts': attempts}
 
 def list_models():
     """Confirms which models this key can actually reach - run once after adding a key."""
