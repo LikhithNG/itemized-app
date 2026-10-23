@@ -458,6 +458,34 @@ ORDER = {"ABOVE_POSTED": 0, "QUANTITY_SUSPECT": 1, "DUPLICATE": 2,
          "NOT_POSTED": 3, "UNREADABLE": 4, "VERIFIED": 5}
 
 
+DOMINANT_SHARE = 50      # percent of a bill at which one line leads the questions
+
+
+def flagged_in_reading_order(reviewed):
+    """The flagged lines, worst first - with one exception that testing forced.
+
+    The default order is certainty: a confirmed rate difference ahead of a quantity that
+    still needs checking, then by amount. That is right for a bill whose lines are
+    comparable in size.
+
+    It is wrong when one line dominates. On the Alta Bates sample code 74177 is 87% of the
+    bill; the page said so, told the reader "if you only have time for one question, make it
+    that one", and then listed it third. Tester 3 read both and stopped there. An earlier
+    pass had tried to patch this by naming the question number - which documented the
+    contradiction rather than resolving it. A line worth more than half the bill now leads,
+    and everything behind it keeps the certainty order.
+    """
+    total = reviewed.get("billed_total") or 0
+
+    def key(line):
+        share = (line.get("charged") or 0) / total * 100 if total else 0
+        return (0 if share >= DOMINANT_SHARE else 1,
+                ORDER.get(line["verdict"], 9),
+                -(line.get("charged") or 0))
+
+    return sorted((l for l in reviewed["lines"] if l["verdict"] != "VERIFIED"), key=key)
+
+
 def action_list(reviewed):
     """The questions to put to the billing office, which is what this tool claims to produce.
 
@@ -465,8 +493,7 @@ def action_list(reviewed):
     sourced questions. Both testers independently wrote their own version of this list at the
     end of their session; the interface was making them do that work by hand.
     """
-    flagged = sorted((l for l in reviewed["lines"] if l["verdict"] != "VERIFIED"),
-                     key=lambda l: (ORDER.get(l["verdict"], 9), -(l.get("charged") or 0)))
+    flagged = flagged_in_reading_order(reviewed)
     if not flagged:
         return ""
     items = "".join(f"<li>{ASKS[l['verdict']](l)}</li>" for l in flagged if l["verdict"] in ASKS)
@@ -873,15 +900,8 @@ if result:
         share = (biggest["charged"] / reviewed["billed_total"] * 100
                  if reviewed["billed_total"] else 0)
         if share >= 50 and biggest["verdict"] != "VERIFIED":
-            # Name the question number. The list is ordered by how certain each finding is -
-            # confirmed rate differences before quantities that need checking - so the
-            # biggest line is often not the first question, and "make it that one" without
-            # a pointer sends the reader hunting.
-            ordered = sorted(flagged, key=lambda l: (ORDER.get(l["verdict"], 9),
-                                                     -(l.get("charged") or 0)))
-            pos = next((i for i, l in enumerate(ordered, 1)
-                        if l["code"] == biggest["code"]), None)
-            where = f" It is question {pos} below." if pos else ""
+            # A line this size now leads the list, so the pointer can simply say so.
+            where = " It is the first question below."
             st.markdown(
                 f"<div class='dominant'><b>One line is {share:.0f}% of this bill.</b> "
                 f"Code <b>{biggest['code']}</b>, at {money(biggest['charged'])}, is flagged "
@@ -890,9 +910,8 @@ if result:
         st.markdown(action_list(reviewed), unsafe_allow_html=True)
         st.markdown(f"<div class='sectlabel'>{len(flagged)} of {len(reviewed['lines'])} lines "
                     f"need attention</div>", unsafe_allow_html=True)
-        # Worst first. Nine cards in bill order buries the ones worth reading.
-        for line in sorted(flagged, key=lambda l: (ORDER.get(l["verdict"], 9),
-                                                   -(l.get("charged") or 0))):
+        # Worst first, same order as the questions, so card N answers question N.
+        for line in flagged_in_reading_order(reviewed):
             st.markdown(verdict_card(line, reviewed['billed_total']), unsafe_allow_html=True)
     else:
         st.success("Every line matches the price this hospital publishes. Nothing to dispute.")
