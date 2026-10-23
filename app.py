@@ -486,6 +486,20 @@ def flagged_in_reading_order(reviewed):
     return sorted((l for l in reviewed["lines"] if l["verdict"] != "VERIFIED"), key=key)
 
 
+def line_quantity_exposure(line):
+    """What one quantity-flagged line puts in question beyond the rate gap.
+
+    A quantity flag and a rate overcharge can sit on the same line. The headline counts the
+    rate part - what was charged above the posted price per unit. This is the rest: what
+    falls away if the line should have been billed once rather than ten times.
+    """
+    posted, units = line.get("posted_price"), line.get("units") or 1
+    if line.get("verdict") != "QUANTITY_SUSPECT" or not posted or units <= 1:
+        return 0.0
+    at_one = round((line.get("charged") or 0) - posted, 2)
+    return round(at_one - (line.get("amount_over") or 0), 2)
+
+
 def unpriced_sentence(unpriced, unpriced_total):
     """Why the three headline figures do not subtract into one another, in one sentence.
 
@@ -550,7 +564,7 @@ def verdict_card(line, bill_total=None):
         over = line.get("amount_over") or 0
         at_one = round(line["charged"] - posted, 2)   # owed back if a single unit was right
         per_unit = round(line["charged"] / units, 2)
-        beyond_rate = round(at_one - over, 2)         # the part the headline does not hold
+        beyond_rate = line_quantity_exposure(line)    # the part the headline does not hold
         if over > 0:
             qty_bit = (f"<div class='why'>Each one was billed at {money(per_unit)} against a "
                        f"posted {money(posted)}, and {money(over)} of that is already counted "
@@ -909,6 +923,23 @@ if result:
             f"{'is' if len(unpriced) == 1 else 'are'} not in this hospital's published "
             f"file. That amount is in the billed total above and in neither of the other "
             f"two figures, so the three do not subtract into one another.</div>",
+            unsafe_allow_html=True)
+
+    # Change 2 held the line on the headline excluding quantity exposure and predicted that a
+    # future version would need to carry a second figure. A tester then ran the Doylestown
+    # sample, read "$288.70" beside a quantity warning worth $14,445, and said the
+    # explanation "appears farther down" - which it did, on the card. The prediction was
+    # right and the cost was real, so the figure now sits with the totals it qualifies.
+    exposure = round(sum(line_quantity_exposure(l) for l in reviewed["lines"]), 2)
+    if exposure > 0:
+        n_qty = sum(1 for l in reviewed["lines"] if line_quantity_exposure(l) > 0)
+        st.markdown(
+            f"<div class='unpriced'><b>A further {money(exposure)} is in question if the "
+            f"quantities are wrong</b> — {n_qty} line(s) below "
+            f"{'is' if n_qty == 1 else 'are'} billed many times over for something a single "
+            f"visit does not usually repeat. That amount is <b>not</b> in the unexplained "
+            f"difference above, which counts only what was charged beyond the posted rate "
+            f"per unit.</div>",
             unsafe_allow_html=True)
 
     flagged = [l for l in reviewed["lines"] if l["verdict"] != "VERIFIED"]
