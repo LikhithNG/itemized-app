@@ -257,7 +257,8 @@ def validate(text, hospital):
         return ("We do not have this hospital's published prices",
                 "This tool compares your bill against prices a hospital publishes, and it "
                 "currently holds files for nine hospitals. Pick the hospital from the list "
-                "below if it is there, or try one of the sample bills to see how it works.")
+                "in step 2 above if it is there, or try one of the sample bills to see how "
+                "it works.")
     return None
 
 
@@ -470,15 +471,20 @@ if run:
     st.session_state.pop("result", None)
 
     problem = validate(bill_text, hospital)
+    # Everything below the first spinner used to happen with no visible acknowledgement, so
+    # a press looked like nothing had happened and got pressed again - and the second press
+    # produced a detailed summary that was then replaced by the fallback as the first run
+    # finished behind it. The status panel appears on the first paint of the rerun.
+    status = None if problem else st.status("Checking your bill…", expanded=True)
     if problem:
         title, detail = problem
         st.error(f"**{title}**\n\n{detail}")
         st.stop()
 
     try:
-        with st.spinner("Reading the bill…"):
-            from ai_reader import read_bill
-            items, meta = read_bill(bill_text)
+        status.write("Reading the statement…")
+        from ai_reader import read_bill
+        items, meta = read_bill(bill_text)
     except Exception:
         items, meta = [], {"ok": False, "error": "unreachable"}
 
@@ -505,10 +511,13 @@ if run:
                  "with a code, a quantity and an amount — rather than the summary page.")
         st.stop()
 
+    status.write(f"Matching {len(items)} line(s) against this hospital's published prices…")
     from checker import check_bill
     reviewed = check_bill({"hospital_name": hospital, "line_items": items}, reference_table())
+    status.write(f"Working out what to ask about {reviewed['flagged_count']} flagged line(s)…")
 
-    with st.spinner("Writing your summary…"):
+    status.write("Writing your summary and letter…")
+    if True:
         narrative, letter = "", ""
         try:
             from ai_advocate import write_narrative
@@ -540,6 +549,7 @@ if run:
         # heading above the previous bill's findings.
         "fingerprint": (bill_text, hospital, mode),
     }
+    status.update(label="Checked", state="complete", expanded=False)
 
 result = st.session_state.get("result")
 if result and result.get("fingerprint") != (bill_text, hospital, mode):

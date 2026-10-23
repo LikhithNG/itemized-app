@@ -33,6 +33,20 @@ def allowed_amounts(reviewed):
         for key in ('charged','posted_price','cash_price','medicare_payment',
                     'expected_for_units','amount_over'):
             add(line.get(key))
+
+        # Figures the Checker establishes by arithmetic on its own fields rather than
+        # storing. They are not inventions - each is a fixed function of values above - and
+        # the prompt hands them to the Advocate explicitly. Leaving them out made the guard
+        # discard any draft that quoted a per-unit rate or a quantity exposure, which is
+        # work the pipeline had asked the model to do. A guard that rejects its own brief
+        # is not fail-closed, it is just broken.
+        charged, posted, units = line.get('charged'), line.get('posted_price'), line.get('units')
+        if isinstance(charged, (int, float)) and isinstance(posted, (int, float)):
+            add(round(charged - posted, 2))                 # owed back at a single unit
+            over = line.get('amount_over') or 0
+            add(round(charged - posted - over, 2))          # the part beyond the rate gap
+            if isinstance(units, int) and units > 1:
+                add(round(charged / units, 2))              # what each one was billed at
     return allowed
 
 def verify(text, reviewed):

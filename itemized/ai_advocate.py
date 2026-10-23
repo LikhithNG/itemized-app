@@ -42,6 +42,11 @@ write that the other lines all match unless every other verdict really is VERIFI
 Never print the verdict names (VERIFIED, ABOVE_POSTED, QUANTITY_SUSPECT, NOT_POSTED,
 DUPLICATE, UNREADABLE). They are internal labels; the patient reads plain English.
 
+The Medicare figure is a national average for the code, from a federal dataset. It is NOT on
+the patient's statement and it is NOT what Medicare paid on this claim. If you mention it,
+call it a national reference or benchmark. Never write that it is "listed on the line",
+"shown on the bill", or that Medicare "paid" it.
+
 Do not invent a reason for a verdict. Each line carries the Checker's own `why flagged`
 note. Say what that note says and nothing beyond it - but put it in your own plain words.
 Never copy the note verbatim, and never repeat it in brackets after your own sentence; it
@@ -92,7 +97,13 @@ def _line_block(rv):
         if l['amount_over'] and l['amount_over'] > 0:
             bits.append(f"difference ${l['amount_over']:,.2f}")
         if l['medicare_payment'] is not None:
-            bits.append(f"medicare pays ${l['medicare_payment']:,.2f}")
+            # Named for what it is. Told "medicare pays $16.39", one draft wrote that the
+            # figure was "listed on the line" - it is a national average from a federal
+            # dataset, is not on the patient's statement, and is not what Medicare paid on
+            # this claim. A patient repeating that to a billing office is making a claim
+            # about their own bill that their own bill does not support.
+            bits.append(f"medicare national average payment for this code "
+                        f"${l['medicare_payment']:,.2f} (reference only, not on this bill)")
         if (l['verdict'] == 'QUANTITY_SUSPECT' and l.get('posted_price')
                 and l.get('units', 0) > 1):
             # Without these the letter quotes the rate difference as if it were the whole
