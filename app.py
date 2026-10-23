@@ -486,6 +486,25 @@ def flagged_in_reading_order(reviewed):
     return sorted((l for l in reviewed["lines"] if l["verdict"] != "VERIFIED"), key=key)
 
 
+def unpriced_sentence(unpriced, unpriced_total):
+    """Why the three headline figures do not subtract into one another, in one sentence.
+
+    Tester 3 raised this twice, in two sessions, either side of a change that did not touch
+    it. The explanation already sat directly beneath the figures and he had still subtracted
+    first and concluded the tool was broken - so it works as a reference and not as a
+    guardrail. It now travels with the plain-language summary and the downloaded review as
+    well, both of which are read on their own, away from the figures they describe.
+    """
+    if not unpriced:
+        return ""
+    codes = ", ".join(l["code"] for l in unpriced)
+    return (f"The three figures above do not subtract into one another: "
+            f"{money(unpriced_total)} of what was billed — "
+            f"{'code' if len(unpriced) == 1 else 'codes'} {codes} — has no published price "
+            f"to compare against, so it is counted in the billed total and in neither of the "
+            f"other two.")
+
+
 def action_list(reviewed):
     """The questions to put to the billing office, which is what this tool claims to produce.
 
@@ -925,6 +944,8 @@ if result:
                 "</div></div>", unsafe_allow_html=True)
     if narrative:
         st.write(plain(narrative))
+        if unpriced:
+            st.info(unpriced_sentence(unpriced, unpriced_total))
         st.caption("Written automatically, then checked line by line against the figures "
                    "above. Any sentence citing an amount we could not verify is discarded "
                    "rather than shown.")
@@ -934,6 +955,8 @@ if result:
             f"{hospital} publishes, {money(reviewed['posted_total'])} is accounted for, "
             f"leaving {money(reviewed['questionable_amount'])} across {len(flagged)} "
             "line(s) worth raising with the billing office."))
+        if unpriced:
+            st.info(unpriced_sentence(unpriced, unpriced_total))
         st.caption("Written from the verified figures directly. The automatic summary was "
                    "withheld because it could not be checked against them.")
 
@@ -957,7 +980,8 @@ if result:
              "",
              "The unexplained difference is a gap to ask the billing office about. It is",
              "not an amount you are owed and not a refund estimate. Where a quantity is in",
-             "question, the posted figure above uses the quantity as billed.", ""] +
+             "question, the posted figure above uses the quantity as billed.", ""]
+            + ([unpriced_sentence(unpriced, unpriced_total), ""] if unpriced else []) +
             [f"{l['code']:>8}  qty {l['units']:>3}  {money(l['charged']):>12}  "
              f"{VERDICTS.get(l['verdict'], ('',))[0]}" for l in reviewed["lines"]]),
         file_name="itemized-review.txt", use_container_width=True)
