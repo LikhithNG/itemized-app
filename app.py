@@ -32,7 +32,12 @@ def _load_credentials():
     secret_files = [HERE / ".streamlit" / "secrets.toml",
                     pathlib.Path.home() / ".streamlit" / "secrets.toml"]
     if any(p.exists() for p in secret_files):
-        for key in ("GROQ_API_KEY", "GROQ_MODEL", "GROQ_POOL", "LLM_PROVIDER"):
+        # GEMINI_* belongs here as well. Photo reading needs a vision model, Groq's pool is
+        # text only, and leaving these out meant the deployed app had no vision credential
+        # at all - every uploaded photo failed with "the reading service did not respond",
+        # which is advice to wait when the real answer was that a key was never promoted.
+        for key in ("GROQ_API_KEY", "GROQ_MODEL", "GROQ_POOL", "LLM_PROVIDER",
+                    "GEMINI_API_KEY", "GEMINI_MODEL", "GEMINI_POOL"):
             try:
                 if key in st.secrets:
                     os.environ.setdefault(key, str(st.secrets[key]))
@@ -57,6 +62,24 @@ def _load_credentials():
 
 
 _load_credentials()
+
+
+def vision_problem():
+    """Why a photo cannot be read, when the reason is configuration rather than weather.
+
+    Reading a photograph needs a vision-capable model. Groq's pool here is text only, so
+    this path depends on a Gemini credential, and a missing one is not something waiting a
+    minute will fix.
+    """
+    key = os.environ.get("GEMINI_API_KEY", "")
+    if not key:
+        return ("no vision key is configured on this server, so photographs cannot be read "
+                "here yet")
+    if "…" in key or key.strip() in {"your-key", "AIza…", "AIza..."}:
+        return "the vision key is still the placeholder text"
+    if not key.startswith("AIza") or len(key) < 30:
+        return "the vision key does not look like a Google API key"
+    return None
 
 
 def credential_problem():
@@ -639,6 +662,16 @@ if run:
             items, meta = read_bill(bill_text)
     except Exception:
         items, meta = [], {"ok": False, "error": "unreachable"}
+
+    if not meta.get("ok") and mode == MODE_IMAGE and vision_problem():
+        st.error(f"**Photographs cannot be read on this server**\n\nReading a photo needs a "
+                 f"vision model, and {vision_problem()}. This is a setup problem, not a "
+                 f"problem with your photo, and trying again will not change it. Use "
+                 f"*Upload a PDF* if you have the statement as a PDF, or *Paste my own bill* "
+                 f"and type the lines in — both of those work.")
+        st.caption(f"For the maintainer: add GEMINI_API_KEY to the app's secrets. "
+                   f"error={str(meta.get('error'))[:140]}")
+        st.stop()
 
     if not meta.get("ok"):
         setup = credential_problem()
