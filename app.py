@@ -162,6 +162,21 @@ CSS = """
 .verdict .src a{color:var(--accent);text-decoration:none;border-bottom:1px solid #C3D4EE}
 .verdict .src .meta{color:var(--faint)}
 
+.unpriced{border:1px solid #D9DEE7;background:#F5F7FA;border-radius:10px;
+  padding:11px 15px;margin:0 0 4px;font-size:13px;color:var(--muted);line-height:1.5}
+.unpriced b{color:var(--ink)}
+
+/* A three-across strip is unreadable on a narrow phone - the third figure was clipped off
+   the right edge at 320px, which is the one the whole page is about. */
+@media (max-width:560px){
+  .totals{flex-direction:column}
+  .totals .cell{border-right:none;border-bottom:1px solid var(--line)}
+  .totals .cell:last-child{border-bottom:none}
+  .mast h1{font-size:31px}
+  .verdict .top{flex-direction:column;gap:2px}
+  .verdict .amt{font-size:17px}
+}
+
 .sectlabel{font-size:12px;letter-spacing:.8px;text-transform:uppercase;font-weight:700;
   color:var(--faint);margin:20px 0 8px}
 .lede{font-size:17px;color:var(--muted);line-height:1.55}
@@ -289,9 +304,17 @@ def source_line(url):
 
 
 ASKS = {
+    # The arithmetic has to survive being read aloud. An earlier version of this line said
+    # "billed $2,457.00 when this hospital publishes $189.00 for it - a difference of
+    # $567.00", which does not subtract: $189.00 is the price of one unit and there are ten
+    # of them. A patient reading that to a billing office is immediately wrong on the maths.
     "ABOVE_POSTED": lambda l: (
-        f"Ask why code <b>{l['code']}</b> was billed {money(l['charged'])} when this hospital "
-        f"publishes {money(l['posted_price'])} for it"
+        (f"Ask why code <b>{l['code']}</b> was billed {money(l['charged'])} for "
+         f"{l['units']} units. This hospital publishes {money(l['posted_price'])} per unit, "
+         f"or {money(round(l['posted_price'] * l['units'], 2))} for {l['units']}"
+         if l.get("units", 1) > 1 else
+         f"Ask why code <b>{l['code']}</b> was billed {money(l['charged'])} when this "
+         f"hospital publishes {money(l['posted_price'])} for it")
         + (f" — a difference of {money(l['amount_over'])}." if l.get("amount_over") else ".")),
     "QUANTITY_SUSPECT": lambda l: (
         f"Ask whether all <b>{l['units']}</b> of code <b>{l['code']}</b> were actually "
@@ -335,7 +358,7 @@ def verdict_card(line):
     posted = line.get("posted_price")
     posted_bit = (f"<div class='figs'>This hospital publishes <b>{money(posted)}</b> "
                   f"for this code"
-                  + (f" · Medicare pays {money(line['medicare_payment'])}"
+                  + (f" · Medicare reference {money(line['medicare_payment'])}"
                      if line.get("medicare_payment") else "")
                   + "</div>") if posted else ""
     qty_bit = ""
@@ -387,31 +410,41 @@ st.markdown(
 
 st.markdown("<div class='step'><div class='n'>1</div><div class='t'>Your bill</div></div>",
             unsafe_allow_html=True)
-tab_sample, tab_paste = st.tabs(["Use a sample bill", "Paste my own bill"])
+# Tabs do not report which one is open, and the bill source used to be "whatever is in the
+# paste box, or else the selected sample". On the paste tab with an empty box that resolved
+# to the sample - so pressing Check with nothing entered returned a full analysis of someone
+# else's bill under the user's own heading. The choice is now explicit, because a tool that
+# can show you the wrong bill's total is worse than one that asks you to pick a radio button.
+MODE_SAMPLE = "Use a sample bill"
+MODE_PASTE = "Paste my own bill"
+mode = st.radio("Where is the bill coming from?", [MODE_SAMPLE, MODE_PASTE],
+                horizontal=True, label_visibility="collapsed", key="bill_mode")
 
-with tab_sample:
+sample_text = ""
+if mode == MODE_SAMPLE:
     st.caption("No bill handy? These are realistic statements you can try the tool on.")
-    choice = st.selectbox(
-        "Sample statement",
-        SAMPLES,
-        format_func=sample_label,
-        key="sample_choice")
+    choice = st.selectbox("Sample statement", SAMPLES, format_func=sample_label,
+                          key="sample_choice")
     sample_text = choice.read_text() if choice else ""
     with st.expander("See the statement"):
         st.code(sample_text, language=None)
         st.caption("Shown exactly as it arrives. Hospitals issue itemized statements in "
                    "very different formats — some print tidy columns, others export "
                    "delimited text — and the reader is built to handle both.")
-
-with tab_paste:
-    pasted = st.text_area(
+else:
+    st.text_area(
         "Paste the text of your itemized statement",
         height=220, placeholder="Copy everything from your itemized bill and paste it here…",
         help="An itemized statement lists each charge with its procedure code, quantity "
              "and amount. A summary bill showing only a total cannot be checked.",
         key="pasted_text")
+    st.caption("Nothing you paste is stored. It is sent to the reading model once to pull "
+               "out the codes, quantities and amounts, and is not retained afterwards. You "
+               "can delete the patient name and account number before pasting — the check "
+               "does not use them.")
 
-bill_text = (st.session_state.get("pasted_text") or "").strip() or sample_text
+bill_text = (st.session_state.get("pasted_text") or "").strip() if mode == MODE_PASTE \
+    else sample_text
 known = hospital_names()
 detected = detect_hospital(bill_text, known) if bill_text else None
 
@@ -502,9 +535,20 @@ if run:
         "narrative": narrative,
         "letter": letter,
         "items_dropped": meta.get("items_dropped"),
+        # Stamped with the exact inputs that produced it. Results used to persist across a
+        # change of sample, hospital or input mode, so a newly chosen hospital appeared as a
+        # heading above the previous bill's findings.
+        "fingerprint": (bill_text, hospital, mode),
     }
 
 result = st.session_state.get("result")
+if result and result.get("fingerprint") != (bill_text, hospital, mode):
+    # The inputs have changed since this was produced. Showing it now would caption one
+    # bill's findings with another bill's hospital.
+    st.session_state.pop("result", None)
+    result = None
+    st.info("The bill or hospital changed, so the previous results were cleared. "
+            "Press **Check this bill** to run the new one.")
 
 if result:
     reviewed = result["reviewed"]
@@ -520,18 +564,41 @@ if result:
     st.markdown("<div class='step'><div class='n'>3</div><div class='t'>What we found"
                 "</div></div>", unsafe_allow_html=True)
 
+    # The three figures do not form an equation and must not look like one. billed_total
+    # covers every line; posted_total covers only the lines this hospital publishes a price
+    # for; the headline is the sum of rate differences, not the subtraction of the first two.
+    # On the Alta Bates sample a reader who subtracts gets $87,463.95 and the page says
+    # $87,098.20 - the $365.75 gap being one line with no published price at all. The old
+    # caption, "For the same lines, at the quantities billed", was simply false. The unpriced
+    # total is now stated rather than left as an unexplained discrepancy.
+    unpriced = [l for l in reviewed["lines"] if l.get("posted_price") is None]
+    unpriced_total = round(sum(l["charged"] for l in unpriced), 2)
+    comparable = round(reviewed["billed_total"] - unpriced_total, 2)
+
     st.markdown(
         "<div class='totals'>"
         f"<div class='cell'><div class='k'>You were billed</div>"
-        f"<div class='v'>{money(reviewed['billed_total'])}</div></div>"
+        f"<div class='v'>{money(reviewed['billed_total'])}</div>"
+        f"<div class='n'>All {reviewed['line_count']} lines on the statement.</div></div>"
         f"<div class='cell'><div class='k'>This hospital publishes</div>"
         f"<div class='v'>{money(reviewed['posted_total'])}</div>"
-        f"<div class='n'>For the same lines, at the quantities billed.</div></div>"
+        f"<div class='n'>Against {money(comparable)} billed on the "
+        f"{reviewed['line_count'] - len(unpriced)} lines it publishes a price for.</div></div>"
         f"<div class='cell hero'><div class='k'>Unexplained difference</div>"
         f"<div class='v'>{money(reviewed['questionable_amount'])}</div>"
         f"<div class='n'>A gap to ask about — not money you are owed, "
         f"and not a refund estimate.</div></div>"
         "</div>", unsafe_allow_html=True)
+
+    if unpriced:
+        st.markdown(
+            f"<div class='unpriced'><b>{money(unpriced_total)} on "
+            f"{len(unpriced)} line(s) could not be compared at all</b> — "
+            f"{', '.join(l['code'] for l in unpriced)} "
+            f"{'is' if len(unpriced) == 1 else 'are'} not in this hospital's published "
+            f"file. That amount is in the billed total above and in neither of the other "
+            f"two figures, so the three do not subtract into one another.</div>",
+            unsafe_allow_html=True)
 
     flagged = [l for l in reviewed["lines"] if l["verdict"] != "VERIFIED"]
     verified = [l for l in reviewed["lines"] if l["verdict"] == "VERIFIED"]
