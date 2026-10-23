@@ -228,7 +228,11 @@ def validate(text, hospital):
         return ("That looks too short to be a bill",
                 "An itemized statement usually lists several lines, each with a code, a "
                 "quantity and an amount. Paste the whole statement rather than one line.")
-    if not re.search(r"\b[A-Z]?\d{3,5}[A-Z]?\b", text):
+    # A CPT code is five digits, a HCPCS code a letter and four. The looser \d{3,5} this
+    # used to match also matched "310" inside "4,310.00", so a summary bill carrying any
+    # dollar amount sailed past the billing-code check and failed later with a less useful
+    # message. The documented example below was unreachable for the input it describes.
+    if not re.search(r"\b([A-Z]\d{4}|\d{5})\b", text):
         return ("No billing codes found",
                 "Every line on an itemized bill carries a procedure code, like 74177 or "
                 "J1885. None were found here — this may be a summary bill rather than an "
