@@ -56,6 +56,54 @@ BILL TEXT:
 # billing code lives in one place - see codes.py for why it is not written inline here.
 from codes import is_code
 
+def read_bill_image(image_bytes, mime_type):
+    """Read a photographed or scanned bill.
+
+    Same extraction, same schema, same sanity filter as read_bill - the only difference is
+    that the statement arrives as pixels instead of characters. It goes to Gemini because
+    that is the vision-capable provider configured here; Groq's pool is text only.
+
+    This does not loosen anything downstream. The model still only reports what it can see
+    on the bill, the Checker still produces every figure from the reference table, and the
+    provenance guard still discards prose citing anything the Checker did not establish. A
+    misread digit becomes a wrong line item, which the Checker will usually return as
+    NOT_POSTED - visible to the reader rather than silently folded into a total.
+    """
+    import base64
+    try:
+        import gemini
+    except ImportError:
+        return [], {'ok': False, 'error': 'vision provider not available',
+                    'items_extracted': 0, 'items_dropped': 0}
+
+    prompt = (PROMPT.format(bill="(the statement is the attached image)")
+              + "\n\nRead the attached image of a hospital statement. Report only line "
+                "items you can actually see. If a digit is unclear, omit that line rather "
+                "than guessing it.")
+    r = gemini.generate(prompt, schema=SCHEMA, temperature=0.0,
+                        image=(mime_type, base64.b64encode(image_bytes).decode()))
+    if not r['ok']:
+        return [], {'ok': False, 'error': r['error'], 'attempts': r.get('attempts'),
+                    'items_extracted': 0, 'items_dropped': 0,
+                    'model': r.get('model'), 'source': 'image'}
+
+    data = r.get('json') or {}
+    items, dropped = [], 0
+    for it in (data.get('line_items') or []):
+        code = str(it.get('code', '')).strip().upper()
+        try:
+            units, charged = int(it.get('units') or 1), float(it.get('charged'))
+        except (TypeError, ValueError):
+            dropped += 1; continue
+        if not is_code(code) or charged <= 0 or units <= 0:
+            dropped += 1; continue
+        items.append({'code': code, 'description': str(it.get('description', '')).strip(),
+                      'units': units, 'charged': round(charged, 2)})
+    return items, {'ok': True, 'attempts': r.get('attempts'), 'usage': r.get('usage'),
+                   'items_extracted': len(items), 'items_dropped': dropped,
+                   'model': r.get('model'), 'source': 'image'}
+
+
 def read_bill(bill_text):
     """Returns (line_items, meta). meta records what happened, for the error-handling log."""
     r = generate(PROMPT.format(bill=bill_text), schema=SCHEMA, temperature=0.0)

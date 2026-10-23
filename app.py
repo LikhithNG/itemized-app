@@ -258,6 +258,30 @@ def hospital_names():
         return sorted({r["hospital_name"] for r in csv.DictReader(fh)})
 
 
+def pdf_text(upload):
+    """Pull the text layer out of an uploaded PDF.
+
+    Most hospital statements arrive as a PDF from a patient portal or an email attachment,
+    and those carry a real text layer. A photographed or scanned bill does not - it is an
+    image in a PDF wrapper, and nothing here can read it. That case returns no text rather
+    than a few characters of noise, so the caller can say so plainly instead of running a
+    check on nothing.
+    """
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        return None, "pdf support is not installed on this server"
+    try:
+        reader = PdfReader(upload)
+        pages = [(pg.extract_text() or "") for pg in reader.pages]
+    except Exception as e:
+        return None, f"this file could not be opened as a PDF ({str(e)[:80]})"
+    text = "\n".join(pages).strip()
+    if len(text) < 40:
+        return None, "scanned"
+    return text, f"{len(reader.pages)} page(s)"
+
+
 def detect_hospital(text, known):
     """Bills print the hospital on the first line, so the user does not have to pick it."""
     head = "\n".join(text.strip().splitlines()[:4]).upper()
@@ -275,12 +299,22 @@ def detect_hospital(text, known):
 from codes import has_code
 
 
-def validate(text, hospital):
+def validate(text, hospital, is_image=False):
     """Return a plain-English problem, or None when the bill is good enough to run."""
     if not text or not text.strip():
         return ("Paste a bill first",
                 "There is nothing to check yet. Pick one of the sample bills, or paste the "
                 "text of your own itemized statement into the box.")
+    if is_image:
+        # Nothing to inspect until the model has looked at the picture. The only thing that
+        # can be checked up front is that a hospital was chosen - the name cannot be read
+        # off a photograph before the read happens.
+        if hospital is None:
+            return ("Pick the hospital that issued this bill",
+                    "A photograph cannot be matched to a hospital before it is read, so "
+                    "choose the hospital in step 2 above. The tool holds published prices "
+                    "for nine of them.")
+        return None
     if len(text.strip()) < 60:
         return ("That looks too short to be a bill",
                 "An itemized statement usually lists several lines, each with a code, a "
@@ -474,10 +508,15 @@ st.markdown("<div class='step'><div class='n'>1</div><div class='t'>Your bill</d
 # can show you the wrong bill's total is worse than one that asks you to pick a radio button.
 MODE_SAMPLE = "Use a sample bill"
 MODE_PASTE = "Paste my own bill"
-mode = st.radio("Where is the bill coming from?", [MODE_SAMPLE, MODE_PASTE],
+MODE_PDF = "Upload a PDF"
+MODE_IMAGE = "Upload a photo"
+mode = st.radio("Where is the bill coming from?",
+                [MODE_SAMPLE, MODE_PASTE, MODE_PDF, MODE_IMAGE],
                 horizontal=True, label_visibility="collapsed", key="bill_mode")
 
 sample_text = ""
+pdf_extracted = ""
+image_bytes = image_mime = None
 if mode == MODE_SAMPLE:
     st.caption("No bill handy? These are realistic statements you can try the tool on.")
     choice = st.selectbox("Sample statement", SAMPLES, format_func=sample_label,
@@ -488,6 +527,50 @@ if mode == MODE_SAMPLE:
         st.caption("Shown exactly as it arrives. Hospitals issue itemized statements in "
                    "very different formats — some print tidy columns, others export "
                    "delimited text — and the reader is built to handle both.")
+elif mode == MODE_PDF:
+    up = st.file_uploader("Your itemized statement as a PDF", type=["pdf"],
+                          key="bill_pdf",
+                          help="A statement downloaded from a patient portal or emailed by "
+                               "the hospital. A photograph of a paper bill will not work — "
+                               "there is no text in it to read.")
+    pdf_note = None
+    if up is not None:
+        pdf_extracted, pdf_note = pdf_text(up)
+        if pdf_extracted:
+            st.success(f"Read {len(pdf_extracted.split())} words from {up.name} "
+                       f"({pdf_note}).")
+            with st.expander("See what was read out of the PDF"):
+                st.code(pdf_extracted[:4000], language=None)
+                st.caption("This is the text the check runs on. If it looks wrong or "
+                           "incomplete, paste the statement instead.")
+        elif pdf_note == "scanned":
+            st.error("**This PDF has no text in it**\n\nIt is a scan or a photograph, so "
+                     "there are no characters to read — only an image of them. Open the "
+                     "statement in your hospital's patient portal and download it again, or "
+                     "switch to *Paste my own bill* and type the lines in.")
+        else:
+            st.error(f"**That file could not be read**\n\n{pdf_note.capitalize()}. Try "
+                     f"downloading the statement again, or paste the text instead.")
+elif mode == MODE_IMAGE:
+    shot = st.file_uploader("A photo or scan of your itemized statement",
+                            type=["jpg", "jpeg", "png", "webp"], key="bill_image",
+                            help="A phone photo of a paper bill works. Get the whole page "
+                                 "in frame, keep it straight on, and make sure the codes "
+                                 "and amounts are in focus.")
+    if shot is not None:
+        image_bytes = shot.getvalue()
+        image_mime = shot.type or "image/jpeg"
+        c1, c2 = st.columns([1, 2])
+        with c1:
+            st.image(image_bytes, caption=shot.name, use_container_width=True)
+        with c2:
+            st.caption(f"{len(image_bytes)/1024:,.0f} KB · {image_mime}")
+            st.caption("The photo is read once to pull out the codes, quantities and "
+                       "amounts, and is not stored. Every price it is compared against "
+                       "still comes from the hospital's published file — the photo supplies "
+                       "the bill, never a price.")
+            if len(image_bytes) > 4_000_000:
+                st.warning("That is a large image. If the read fails, try a smaller photo.")
 else:
     st.text_area(
         "Paste the text of your itemized statement",
@@ -500,8 +583,16 @@ else:
                "can delete the patient name and account number before pasting — the check "
                "does not use them.")
 
-bill_text = (st.session_state.get("pasted_text") or "").strip() if mode == MODE_PASTE \
-    else sample_text
+if mode == MODE_PASTE:
+    bill_text = (st.session_state.get("pasted_text") or "").strip()
+elif mode == MODE_PDF:
+    bill_text = (pdf_extracted or "").strip()
+elif mode == MODE_IMAGE:
+    # There is no text to validate until the model has looked at the picture, so a photo
+    # stands in for the bill text through the checks that run before the read.
+    bill_text = "(photograph of a statement)" if image_bytes else ""
+else:
+    bill_text = sample_text
 known = hospital_names()
 detected = detect_hospital(bill_text, known) if bill_text else None
 
@@ -526,7 +617,7 @@ if run:
     # the previous bill's results sitting under the error message.
     st.session_state.pop("result", None)
 
-    problem = validate(bill_text, hospital)
+    problem = validate(bill_text, hospital, is_image=(mode == MODE_IMAGE))
     # Everything below the first spinner used to happen with no visible acknowledgement, so
     # a press looked like nothing had happened and got pressed again - and the second press
     # produced a detailed summary that was then replaced by the fallback as the first run
@@ -538,9 +629,14 @@ if run:
         st.stop()
 
     try:
-        status.write("Reading the statement…")
-        from ai_reader import read_bill
-        items, meta = read_bill(bill_text)
+        if mode == MODE_IMAGE:
+            status.write("Looking at the photograph…")
+            from ai_reader import read_bill_image
+            items, meta = read_bill_image(image_bytes, image_mime)
+        else:
+            status.write("Reading the statement…")
+            from ai_reader import read_bill
+            items, meta = read_bill(bill_text)
     except Exception:
         items, meta = [], {"ok": False, "error": "unreachable"}
 
@@ -559,6 +655,13 @@ if run:
                      "not respond. This is on us, not your bill — wait about a minute and "
                      "press Check this bill again. Nothing you entered was lost.")
             st.caption(f"For the maintainer: {str(meta.get('error'))[:200]}")
+        st.stop()
+
+    if not items and mode == MODE_IMAGE:
+        st.error("**No charges could be read from that photo**\n\nThe image came through "
+                 "but no lines with a code, a quantity and an amount could be made out. "
+                 "Try again with the whole page in frame, straight on, in good light — or "
+                 "switch to *Paste my own bill* and type the lines in.")
         st.stop()
 
     if not items:
@@ -603,12 +706,14 @@ if run:
         # Stamped with the exact inputs that produced it. Results used to persist across a
         # change of sample, hospital or input mode, so a newly chosen hospital appeared as a
         # heading above the previous bill's findings.
-        "fingerprint": (bill_text, hospital, mode),
+        "fingerprint": (bill_text, hospital, mode,
+                        len(image_bytes) if image_bytes else 0),
     }
     status.update(label="Checked", state="complete", expanded=False)
 
 result = st.session_state.get("result")
-if result and result.get("fingerprint") != (bill_text, hospital, mode):
+if result and result.get("fingerprint") != (
+        bill_text, hospital, mode, len(image_bytes) if image_bytes else 0):
     # The inputs have changed since this was produced. Showing it now would caption one
     # bill's findings with another bill's hospital.
     st.session_state.pop("result", None)

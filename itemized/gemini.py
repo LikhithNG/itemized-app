@@ -61,36 +61,54 @@ def _post(url, payload):
     with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
         return json.loads(r.read())
 
-def generate(prompt, schema=None, temperature=0.0, model=None):
+def generate(prompt, schema=None, temperature=0.0, model=None, image=None):
     """Calls the pool in order, skipping models already known to be out of daily quota.
     Returns the first success, or the last failure if every model is exhausted."""
     if model:
-        return _generate_one(prompt, schema, temperature, model)
+        return _generate_one(prompt, schema, temperature, model, image)
     last = {'ok': False, 'error': 'no models available', 'attempts': 0}
     for m in POOL:
         if m in _exhausted:
             continue
-        r = _generate_one(prompt, schema, temperature, m)
+        r = _generate_one(prompt, schema, temperature, m, image)
         if r['ok']:
             r['model'] = m
             return r
         last = r
-        if 'RESOURCE_EXHAUSTED' in str(r.get('error','')) or '429' in str(r.get('error','')):
+        err = str(r.get('error', ''))
+        if 'RESOURCE_EXHAUSTED' in err or '429' in err:
             _exhausted.add(m)          # out of daily quota - retire it and move on
             continue
-        return r                       # a non-quota failure is not fixed by another model
+        # A 503 means this model is overloaded right now, which is the other thing a pool
+        # is for. The comment below used to say a non-quota failure is not fixed by another
+        # model; that is true of a malformed request and false of an overloaded one. Tried
+        # on a day when gemini-3.8-flash was returning 503 to every request, the pool gave
+        # up after one model while five others were available and working.
+        if any(code in err for code in ('HTTP 503', 'HTTP 502', 'HTTP 500', 'UNAVAILABLE')):
+            continue                   # overloaded, not broken - the next model may serve
+        return r                       # a malformed request is not fixed by another model
     last['model'] = None
     last['pool_exhausted'] = True
     return last
 
-def _generate_one(prompt, schema, temperature, model):
-    """One model, with bounded retries and exponential backoff."""
+def _generate_one(prompt, schema, temperature, model, image=None):
+    """One model, with bounded retries and exponential backoff.
+
+    `image` is an optional (mime_type, base64_data) pair. A photograph of a bill has no
+    text layer to extract, so the only way to read one is to let the model look at it -
+    the same extraction task, a different input channel. Everything downstream is
+    unchanged: the Checker still produces every figure and the guard still holds.
+    """
     url = f"{BASE}/models/{model}:generateContent?key={_key()}"
     cfg = {'temperature': temperature}
     if schema:
         cfg['responseMimeType'] = 'application/json'
         cfg['responseSchema'] = schema
-    payload = {'contents': [{'parts': [{'text': prompt}]}], 'generationConfig': cfg}
+    parts = [{'text': prompt}]
+    if image:
+        mime, b64 = image
+        parts.append({'inline_data': {'mime_type': mime, 'data': b64}})
+    payload = {'contents': [{'parts': parts}], 'generationConfig': cfg}
 
     last = None
     for attempt in range(1, ATTEMPTS + 1):
