@@ -94,92 +94,131 @@ VERDICTS = {
 
 CSS = """
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Inter:wght@400;500;600;700&display=swap');
+
 :root{
-  --ink:#121620; --muted:#5A6373; --faint:#8A93A3; --line:#E3E8F0;
-  --bad:#B4322B; --warn:#9A6B0E; --ok:#15804F; --info:#4A5568; --accent:#1E4FA3;
-  --bad-bg:#FDF3F2; --warn-bg:#FDF8EC; --ok-bg:#F1F8F4; --info-bg:#F5F7FA;
+  --ink:#14181F; --muted:#59616F; --faint:#8891A0; --line:#E4E8F0; --rule:#121620;
+  --bad:#A32B24; --warn:#8A5E0A; --ok:#136B45; --info:#48505E; --accent:#1B4590;
+  --bad-bg:#FDF4F3; --warn-bg:#FDF9F0; --ok-bg:#F2F8F5; --info-bg:#F6F8FB;
+  --paper:#FCFCFD;
+  --sans:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;
+  --serif:'Newsreader',Georgia,'Times New Roman',serif;
 }
-.block-container{max-width:880px;padding-top:2.2rem}
+html,body,[class*="css"]{font-family:var(--sans)}
+.block-container{max-width:900px;padding-top:2rem}
+.stApp{background:var(--paper)}
 
 /* ---- masthead ---------------------------------------------------------- */
-.mast{border-bottom:3px solid var(--ink);padding-bottom:16px;margin-bottom:6px}
-.mast h1{font-size:40px;letter-spacing:-1.1px;line-height:1;margin:0 0 9px;
-  font-weight:700;color:var(--ink)}
-.mast .sub{font-size:16.5px;color:var(--muted);line-height:1.5;max-width:62ch;margin:0}
-.badge{display:inline-block;font-size:11px;letter-spacing:.9px;text-transform:uppercase;
-  font-weight:700;color:var(--accent);background:#EAF0FB;border-radius:999px;
-  padding:4px 11px;margin-bottom:11px}
+.mast{border-bottom:3px solid var(--rule);padding-bottom:18px;margin-bottom:4px}
+.mast h1{font-family:var(--serif);font-size:54px;font-weight:600;letter-spacing:-1.4px;
+  line-height:.95;margin:2px 0 11px;color:var(--ink)}
+.mast .sub{font-size:16.5px;color:var(--muted);line-height:1.5;max-width:60ch;margin:0;
+  font-weight:400}
+.badge{display:inline-block;font-size:10.5px;letter-spacing:1.1px;text-transform:uppercase;
+  font-weight:700;color:var(--accent);background:#EAF0FA;border:1px solid #D4E0F2;
+  border-radius:999px;padding:4px 12px}
 
 /* ---- step headers ------------------------------------------------------ */
-.step{display:flex;align-items:center;gap:10px;margin:26px 0 10px}
-.step .n{width:23px;height:23px;border-radius:50%;background:var(--ink);color:#fff;
-  font-size:12.5px;font-weight:700;display:flex;align-items:center;justify-content:center;
-  flex:0 0 23px}
-.step .t{font-size:18px;font-weight:700;color:var(--ink)}
+.step{display:flex;align-items:center;gap:11px;margin:30px 0 11px}
+.step .n{width:25px;height:25px;border-radius:50%;background:var(--rule);color:#fff;
+  font-family:var(--serif);font-size:14px;font-weight:600;display:flex;align-items:center;
+  justify-content:center;flex:0 0 25px;padding-bottom:1px}
+.step .t{font-family:var(--serif);font-size:22px;font-weight:600;color:var(--ink);
+  letter-spacing:-.3px}
 
 /* ---- the headline figures --------------------------------------------- */
-.totals{display:flex;gap:0;border:1px solid var(--line);border-radius:12px;
-  overflow:hidden;margin:4px 0 10px;background:#fff}
-.totals .cell{flex:1;padding:15px 17px;border-right:1px solid var(--line)}
-.totals .cell:last-child{border-right:none;background:#FBF8F2}
-.totals .k{font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;
-  color:var(--faint);font-weight:700;margin-bottom:5px}
-.totals .v{font-size:25px;font-weight:700;color:var(--ink);letter-spacing:-.6px;
-  line-height:1.1}
-.totals .cell.hero .v{color:#8A5A00;font-size:29px}
-.totals .n{font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.4}
+.totals{display:flex;border:1px solid var(--line);border-radius:14px;overflow:hidden;
+  margin:4px 0 10px;background:#fff;box-shadow:0 1px 2px rgba(20,24,31,.04)}
+.totals .cell{flex:1;padding:17px 19px;border-right:1px solid var(--line)}
+.totals .cell:last-child{border-right:none;background:linear-gradient(180deg,#FFFBF3,#FFF8EC)}
+.totals .k{font-size:10.5px;letter-spacing:.9px;text-transform:uppercase;color:var(--faint);
+  font-weight:700;margin-bottom:6px}
+.totals .v{font-size:27px;font-weight:600;color:var(--ink);letter-spacing:-.8px;
+  line-height:1.05;font-variant-numeric:tabular-nums}
+.totals .cell.hero .v{color:#7A4F00;font-size:32px}
+.totals .n{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.45}
 
-/* ---- what to do next --------------------------------------------------- */
-.todo{border:1px solid #D6E0F2;background:#F7FAFF;border-radius:12px;
-  padding:16px 18px;margin:14px 0 6px}
-.todo .h{font-size:13px;letter-spacing:.6px;text-transform:uppercase;font-weight:700;
-  color:var(--accent);margin-bottom:9px}
-.todo ol{margin:0;padding-left:19px}
-.todo li{font-size:14.5px;color:var(--ink);line-height:1.55;margin-bottom:7px}
+/* ---- what to ask ------------------------------------------------------- */
+.todo{border:1px solid #CFDCF0;background:linear-gradient(180deg,#F8FBFF,#F3F7FD);
+  border-radius:14px;padding:18px 20px;margin:14px 0 6px}
+.todo .h{font-size:11.5px;letter-spacing:1px;text-transform:uppercase;font-weight:700;
+  color:var(--accent);margin-bottom:11px}
+.todo ol{margin:0;padding-left:20px}
+.todo li{font-size:14.5px;color:var(--ink);line-height:1.6;margin-bottom:9px}
 .todo li:last-child{margin-bottom:0}
-.todo .tail{font-size:12.5px;color:var(--muted);margin:10px 0 0;line-height:1.5}
+.todo .tail{font-size:12.5px;color:var(--muted);margin:12px 0 0;line-height:1.5}
 
 /* ---- line cards -------------------------------------------------------- */
-.verdict{border:1px solid var(--line);border-left-width:4px;border-radius:10px;
-  padding:13px 16px;margin-bottom:9px;background:#fff}
+.verdict{border:1px solid var(--line);border-left-width:4px;border-radius:12px;
+  padding:14px 17px 12px;margin-bottom:10px;background:#fff;position:relative;
+  box-shadow:0 1px 2px rgba(20,24,31,.03)}
 .verdict.ok{border-left-color:var(--ok);background:var(--ok-bg)}
 .verdict.bad{border-left-color:var(--bad);background:var(--bad-bg)}
 .verdict.warn{border-left-color:var(--warn);background:var(--warn-bg)}
 .verdict.info{border-left-color:var(--info);background:var(--info-bg)}
 .verdict .top{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
-.verdict .label{font-weight:700;font-size:14.5px;color:var(--ink)}
+.verdict .label{font-weight:600;font-size:14.5px;color:var(--ink);letter-spacing:-.1px}
+.verdict .glyph{display:inline-block;width:17px;font-weight:700;text-align:center}
 .verdict.ok .label{color:var(--ok)}
 .verdict.bad .label{color:var(--bad)}
 .verdict.warn .label{color:var(--warn)}
-.verdict .amt{font-weight:700;font-size:15.5px;white-space:nowrap;color:var(--ink)}
-.verdict .desc{font-size:13.5px;color:var(--ink);margin-top:4px}
-.verdict .code{font-family:'SF Mono',Menlo,monospace;font-size:12.5px;color:var(--muted)}
-.verdict .why{font-size:13px;color:var(--muted);margin-top:5px;line-height:1.5}
-.verdict .figs{font-size:12.5px;color:var(--muted);margin-top:7px;
-  padding-top:7px;border-top:1px dashed var(--line)}
-.verdict .figs b{color:var(--ink);font-weight:700}
-.verdict .src{font-size:12px;margin-top:6px}
-.verdict .src a{color:var(--accent);text-decoration:none;border-bottom:1px solid #C3D4EE}
+.verdict.info .label{color:var(--info)}
+.verdict .amt{font-weight:600;font-size:16px;white-space:nowrap;color:var(--ink);
+  font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+.verdict .desc{font-size:13.5px;color:var(--ink);margin-top:5px}
+.verdict .code{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:12px;
+  color:var(--muted);background:rgba(20,24,31,.045);padding:1px 6px;border-radius:4px}
+.verdict .why{font-size:13px;color:var(--muted);margin-top:6px;line-height:1.55}
+.verdict .figs{font-size:12.5px;color:var(--muted);margin-top:8px;padding-top:8px;
+  border-top:1px dashed var(--line)}
+.verdict .figs b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.verdict .src{font-size:11.5px;margin-top:7px}
+.verdict .src a{color:var(--accent);text-decoration:none;border-bottom:1px solid #C6D6EE}
 .verdict .src .meta{color:var(--faint)}
 
-.unpriced{border:1px solid #D9DEE7;background:#F5F7FA;border-radius:10px;
-  padding:11px 15px;margin:0 0 4px;font-size:13px;color:var(--muted);line-height:1.5}
-.unpriced b{color:var(--ink)}
+/* share-of-bill bar: which line actually is the bill */
+.share{display:flex;align-items:center;gap:9px;margin-top:9px}
+.share .track{flex:1;height:5px;background:rgba(20,24,31,.07);border-radius:3px;
+  overflow:hidden}
+.share .fill{height:100%;border-radius:3px;background:currentColor;opacity:.55}
+.verdict.ok .share{color:var(--ok)}
+.verdict.bad .share{color:var(--bad)}
+.verdict.warn .share{color:var(--warn)}
+.verdict.info .share{color:var(--info)}
+.share .pct{font-size:11px;color:var(--faint);white-space:nowrap;
+  font-variant-numeric:tabular-nums}
 
-/* A three-across strip is unreadable on a narrow phone - the third figure was clipped off
-   the right edge at 320px, which is the one the whole page is about. */
+.dominant{border:1px solid #E3D6B8;background:#FFFCF4;border-radius:12px;padding:13px 17px;
+  margin:0 0 10px;font-size:13.5px;color:var(--ink);line-height:1.55}
+.dominant b{font-weight:600}
+
+.unpriced{border:1px solid var(--line);background:#F6F8FB;border-radius:12px;
+  padding:12px 16px;margin:0 0 6px;font-size:13px;color:var(--muted);line-height:1.55}
+.unpriced b{color:var(--ink);font-weight:600}
+
+.sectlabel{font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:700;
+  color:var(--faint);margin:22px 0 9px}
+
+/* ---- narrow screens ---------------------------------------------------- */
 @media (max-width:560px){
   .totals{flex-direction:column}
   .totals .cell{border-right:none;border-bottom:1px solid var(--line)}
   .totals .cell:last-child{border-bottom:none}
-  .mast h1{font-size:31px}
-  .verdict .top{flex-direction:column;gap:2px}
-  .verdict .amt{font-size:17px}
+  .mast h1{font-size:40px}
+  .verdict .top{flex-direction:column;gap:3px}
+  .verdict .amt{font-size:18px}
 }
 
-.sectlabel{font-size:12px;letter-spacing:.8px;text-transform:uppercase;font-weight:700;
-  color:var(--faint);margin:20px 0 8px}
-.lede{font-size:17px;color:var(--muted);line-height:1.55}
+/* ---- print: this gets taken to a phone call ---------------------------- */
+@media print{
+  .stApp{background:#fff}
+  header,footer,[data-testid="stToolbar"],[data-testid="stStatusWidget"],
+  .stButton,.stRadio,.stSelectbox,.stTextArea,[data-testid="stExpander"] button{display:none !important}
+  .block-container{max-width:100%;padding:0}
+  .verdict,.todo,.totals,.dominant,.unpriced{break-inside:avoid;box-shadow:none}
+  .todo{border:1px solid #999;background:#fff}
+  a{text-decoration:underline}
+}
 </style>
 """
 
@@ -353,9 +392,16 @@ def action_list(reviewed):
             "file this hospital publishes itself, linked under each line below.</p></div>")
 
 
-def verdict_card(line):
+# Colour is not the only signal. Roughly one man in twelve cannot separate the red and green
+# these cards rely on, and this one is about money.
+GLYPH = {"VERIFIED": "✓", "ABOVE_POSTED": "▲", "QUANTITY_SUSPECT": "✱",
+         "NOT_POSTED": "?", "DUPLICATE": "⧉", "UNREADABLE": "—"}
+
+
+def verdict_card(line, bill_total=None):
     label, tone, why = VERDICTS.get(
         line["verdict"], ("Checked", "info", ""))
+    glyph = GLYPH.get(line["verdict"], "·")
     posted = line.get("posted_price")
     posted_bit = (f"<div class='figs'>This hospital publishes <b>{money(posted)}</b> "
                   f"for this code"
@@ -386,17 +432,27 @@ def verdict_card(line):
                        f"Each one was charged at the posted rate, so none of this line is "
                        f"counted in the unexplained difference above — but if the quantity "
                        f"is wrong, {money(at_one)} of this charge is in question.</div>")
+    # Every card is the same height, so nothing on the page shows that one line can be
+    # almost the entire bill. On the Alta Bates statement code 74177 is 87% of it. A patient
+    # deciding where to spend a phone call should be able to see that without doing division.
+    share_bit = ""
+    if bill_total and bill_total > 0 and line.get("charged"):
+        pct = line["charged"] / bill_total * 100
+        share_bit = (f"<div class='share'><div class='track'>"
+                     f"<div class='fill' style='width:{min(pct, 100):.1f}%'></div></div>"
+                     f"<span class='pct'>{pct:.0f}% of the bill</span></div>")
     src = line.get("source_url") or ""
     src_bit = source_line(src) if src else ""
     # Emitted as one line: a blank line inside raw HTML ends the block for Streamlit's
     # markdown parser, which then prints the trailing tags as text.
     return (
         f"<div class='verdict {tone}'>"
-        f"<div class='top'><span class='label'>{label}</span>"
+        f"<div class='top'><span class='label'>"
+        f"<span class='glyph'>{glyph}</span> {label}</span>"
         f"<span class='amt'>{money(line['charged'])}</span></div>"
         f"<div class='desc'>{line.get('description','')}"
         f"<span class='code'> · {line['code']} · qty {line['units']}</span></div>"
-        f"<div class='why'>{why}</div>{posted_bit}{qty_bit}{src_bit}"
+        f"<div class='why'>{why}</div>{posted_bit}{qty_bit}{share_bit}{src_bit}"
         f"</div>")
 
 
@@ -614,20 +670,38 @@ if result:
     verified = [l for l in reviewed["lines"] if l["verdict"] == "VERIFIED"]
 
     if flagged:
+        biggest = max(reviewed["lines"], key=lambda l: l.get("charged") or 0)
+        share = (biggest["charged"] / reviewed["billed_total"] * 100
+                 if reviewed["billed_total"] else 0)
+        if share >= 50 and biggest["verdict"] != "VERIFIED":
+            # Name the question number. The list is ordered by how certain each finding is -
+            # confirmed rate differences before quantities that need checking - so the
+            # biggest line is often not the first question, and "make it that one" without
+            # a pointer sends the reader hunting.
+            ordered = sorted(flagged, key=lambda l: (ORDER.get(l["verdict"], 9),
+                                                     -(l.get("charged") or 0)))
+            pos = next((i for i, l in enumerate(ordered, 1)
+                        if l["code"] == biggest["code"]), None)
+            where = f" It is question {pos} below." if pos else ""
+            st.markdown(
+                f"<div class='dominant'><b>One line is {share:.0f}% of this bill.</b> "
+                f"Code <b>{biggest['code']}</b>, at {money(biggest['charged'])}, is flagged "
+                f"below.{where} If you only have time for one question, make it that one."
+                f"</div>", unsafe_allow_html=True)
         st.markdown(action_list(reviewed), unsafe_allow_html=True)
         st.markdown(f"<div class='sectlabel'>{len(flagged)} of {len(reviewed['lines'])} lines "
                     f"need attention</div>", unsafe_allow_html=True)
         # Worst first. Nine cards in bill order buries the ones worth reading.
         for line in sorted(flagged, key=lambda l: (ORDER.get(l["verdict"], 9),
                                                    -(l.get("charged") or 0))):
-            st.markdown(verdict_card(line), unsafe_allow_html=True)
+            st.markdown(verdict_card(line, reviewed['billed_total']), unsafe_allow_html=True)
     else:
         st.success("Every line matches the price this hospital publishes. Nothing to dispute.")
 
     if verified:
         with st.expander(f"{len(verified)} line(s) matched the published price"):
             for line in verified:
-                st.markdown(verdict_card(line), unsafe_allow_html=True)
+                st.markdown(verdict_card(line, reviewed['billed_total']), unsafe_allow_html=True)
 
     st.markdown("<div class='step'><div class='n'>4</div><div class='t'>In plain language"
                 "</div></div>", unsafe_allow_html=True)
